@@ -26,4 +26,4 @@ Completed: 149 unit/API/frontend tests, nine real-browser tests, UI smoke, captu
 
 ## Phase 6 — GitHub Pages validation
 
-Validate a production build at the repository base path, the manual deployment workflow, actual Pages delivery, and permitted HTTPS/WSS backend connectivity from an authorized remote device. Confirm the static frontend does not contain secrets. No deployment has been executed during Phase 1.
+Completed locally: repository-path production build, artifact and secret checks, production content policy, manual deployment workflow and full Pages-path UI smoke. Actual hosted delivery and remote-device connectivity require separate approval and remain unverified. See [Phase 6 preparation](phase-6.md).

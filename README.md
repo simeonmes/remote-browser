@@ -1,14 +1,14 @@
 # Personal Remote Browser
 
-A Windows-first, single-user remote Chromium project. React, TypeScript, Vite, Tailwind CSS and Lucide power the frontend; Node.js, TypeScript, Fastify and Playwright power the backend.
+A Windows-first personal Chromium application built with React, TypeScript, Vite, Tailwind CSS, Lucide, Fastify, Playwright and WebSockets.
 
-**Current milestone: Phase 5 - testing and performance.** Start an isolated Chromium session, browse allowlisted HTTPS test pages, and use mouse, keyboard, scrolling, navigation history and responsive resizing. Binary JPEG updates arrive over an authenticated WebSocket, up to 5 fps. Page scripts remain disabled and all listeners remain localhost-only. See [Phase 3 details and limitations](docs/phase-3.md).
+**Phases 1–6 are implemented locally.** The app supports a live viewport, mouse and keyboard input, scrolling, navigation history, resizing, authentication and connection recovery. The frontend is prepared for GitHub Pages. Nothing has been pushed or deployed publicly.
 
-## Start on Windows
+This is a deliberately constrained prototype: exact HTTPS domain allowlist, GET-only resources, page scripts disabled, ephemeral browser state, and loopback-only listeners. It is useful for authorized static test websites and native HTML controls. JavaScript applications, upstream authenticated browsing, downloads, popups, audio/video streaming and remote-device networking are outside this version.
 
-Prerequisites: Node.js **24.x**, npm **11+**, and VS Code. Git is needed when you publish the repository. No global npm packages or administrator privileges are required.
+## Run on Windows
 
-From PowerShell in this directory:
+Prerequisites: Node.js **24.x**, npm **11+**, Git and VS Code. In a PowerShell terminal at the repository root:
 
 ```powershell
 npm ci
@@ -17,121 +17,103 @@ npm run browser:install
 npm run dev
 ```
 
-1. Open `http://127.0.0.1:5173` on this computer.
-2. Open `backend/.env` locally in VS Code. Copy the **value** of `AUTH_SECRET` into the application's **Access key** field.
-3. Choose **Connect backend**, then **Start browser**. The default `https://example.com/` page appears in the viewport.
-4. Use the address bar, Home or Refresh to load a permitted page. Choose **Stop browser** to end the session; disconnecting also closes it.
-5. Press Ctrl+C in the development terminal to stop both services.
+Open **http://127.0.0.1:5173/**. Copy the value of `AUTH_SECRET` from your local `backend/.env` into **Access key**, select **Connect backend**, then **Start browser**. The default permitted page is `https://example.com/`.
 
-`npm run setup` creates a cryptographically random access key without printing it, creates the frontend environment file, and never overwrites existing environment files. Both `.env` files are ignored by Git. Treat `backend/.env` as a credential; Windows filesystem ACLs govern access to it. Do not share it or put its contents in an issue or screenshot.
+Click the live viewport to focus remote input. Type normally, paste text, scroll with the wheel, or use Back/Forward/Refresh/Home. Mobile devices have text submission and scroll buttons. **Shift+Escape** releases viewport focus. **Stop browser** ends the browser session; **Disconnect** also revokes authentication. Ctrl+C stops the development servers.
 
-The frontend binds to `127.0.0.1:5173`; the backend binds to `127.0.0.1:4318`. This phase cannot be accessed from another device. It does not change firewall rules, configure a tunnel, expose a debugging port, or publish anything.
+Setup generates a random key without printing it and preserves existing configuration. The browser download stays in the ignored project `.playwright` directory. It does not install a system browser. If PowerShell blocks `npm.ps1`, use `npm.cmd`; no execution-policy changes are needed.
+
+The frontend listens on **127.0.0.1:5173**, the backend on **127.0.0.1:4318**. No firewall rules, tunnels, public listeners or browser debugging ports are configured. On another device, `127.0.0.1` refers to that device, not this laptop. Remote access requires a separately approved network deployment.
 
 ## Commands
 
-| Command                   | Purpose                                                             |
-| ------------------------- | ------------------------------------------------------------------- |
-| `npm run setup`           | Create local config without overwriting it                          |
-| `npm run dev`             | Run frontend and backend in development                             |
-| `npm run dev:frontend`    | Run the frontend separately                                         |
-| `npm run dev:backend`     | Run the backend separately                                          |
-| `npm run typecheck`       | Check frontend, backend, shared contracts, and tests                |
-| `npm test`                | Run unit, API, policy and frontend tests without Chromium           |
-| `npm run test:browser`    | Run real Chromium integration tests against the local fixture       |
-| `npm run test:watch`      | Watch automated tests                                               |
-| `npm run check`           | Typecheck, test, and build everything                               |
-| `npm run build`           | Build shared contracts, backend, and static frontend                |
-| `npm start`               | Run the built backend; build first                                  |
-| `npm run smoke`           | Build and test the actual UI/API with a disposable headless browser |
-| `npm run browser:install` | Download project-managed Chromium for browser testing / Phase 2     |
+| Command                                        | Purpose                                                               |
+| ---------------------------------------------- | --------------------------------------------------------------------- |
+| `npm run setup`                                | Generate local configuration without overwriting it                   |
+| `npm run browser:install`                      | Download project-managed Chromium                                     |
+| `npm run dev`                                  | Start both development servers                                        |
+| `npm run dev:backend` / `npm run dev:frontend` | Start either development server separately                            |
+| `npm run check`                                | Typecheck frontend/backend/shared/tests, run unit/API/UI tests, build |
+| `npm run test:browser`                         | Real Chromium tests against an isolated local fixture                 |
+| `npm run smoke`                                | Build and exercise the real frontend/API/browser on localhost         |
+| `npm run profile`                              | Warmed ten-session memory and cleanup check                           |
+| `npm run build`                                | Build backend, shared package and static frontend                     |
+| `npm start`                                    | Run the built backend                                                 |
+| `npm run build:pages`                          | Build and verify static assets at `/remote-browser/`                  |
+| `npm run smoke:pages`                          | Exercise the Pages build locally without publishing                   |
+| `npm run preview:frontend`                     | Preview built static assets on loopback port 5173                     |
+| `npm run format:check`                         | Check formatting                                                      |
 
-The installer automatically keeps Chromium in the ignored project `.playwright` directory. To override that location consistently:
-
-```powershell
-$env:PLAYWRIGHT_BROWSERS_PATH = "$PWD\.playwright"
-npm run browser:install
-npm run smoke
-```
-
-This downloads a Playwright-managed browser, not a system browser installation. It is unnecessary for `npm test`, but required by the default engine and real-browser tests. The smoke-test frontend can optionally use an already-installed browser in a fresh, temporary profile (the remote engine still uses managed Chromium):
-
-```powershell
-$env:SMOKE_BROWSER_CHANNEL = "chrome" # or "msedge"
-npm run smoke
-```
-
-See [Windows setup](docs/windows-setup.md) and [troubleshooting](docs/troubleshooting.md).
-
-## Repository
-
-```text
-frontend/              React UI, API client, Vite configuration
-backend/               Fastify API, auth, Chromium engine, pinned resource fetcher
-shared/                Zod schemas and shared TypeScript contracts
-tests/                 Auth, validation, API integration, and UI tests
-scripts/               Safe local setup and browser smoke checks
-docs/                  Architecture, security, setup, deployment, milestones
-.github/workflows/     Cross-platform checks and manual Pages deployment
-```
+Stop development servers before smoke tests, which own ports 4318 and 5173. Tests use generated keys and isolated browser profiles; they do not use personal browser tabs or cookies. Test screenshots and measurements are ignored by Git.
 
 ## Configuration
 
-Backend values live in `backend/.env`; operating-system environment variables take precedence. Startup validates configuration and fails closed.
+Backend configuration is loaded from `backend/.env`; process environment values take precedence.
 
-| Variable           | Default / requirement                                                         |
-| ------------------ | ----------------------------------------------------------------------------- |
-| `AUTH_SECRET`      | Required random key, 32–256 characters; generated by setup                    |
-| `PORT`             | `4318`, integer 1024–65535                                                    |
-| `ALLOWED_ORIGINS`  | `http://127.0.0.1:5173,http://localhost:5173`; exact, comma-separated origins |
-| `ALLOWED_DOMAINS`  | `example.com,www.example.com`; exact hostnames, no wildcards                  |
-| `HOME_URL`         | `https://example.com/`; must pass the allowlist gate                          |
-| `AUTH_TTL_SECONDS` | `1800`; allowed range 60–3600 seconds                                         |
-| `LOG_LEVEL`        | `info`; also `silent`, `error`, `warn`, `debug`                               |
+| Variable           | Default / requirement                                        |
+| ------------------ | ------------------------------------------------------------ |
+| `AUTH_SECRET`      | Required random key, 32–256 characters; generated by setup   |
+| `PORT`             | `4318`, integer 1024–65535                                   |
+| `ALLOWED_ORIGINS`  | `http://127.0.0.1:5173,http://localhost:5173`; exact origins |
+| `ALLOWED_DOMAINS`  | `example.com,www.example.com`; exact hostnames, no wildcards |
+| `HOME_URL`         | `https://example.com/`; must pass the allowlist              |
+| `AUTH_TTL_SECONDS` | `1800`; range 60–3600, absolute expiry                       |
+| `BROWSER_CHANNEL`  | `chromium`; optionally installed `chrome` or `msedge`        |
+| `LOG_LEVEL`        | `info`; also `silent`, `error`, `warn`, `debug`              |
 
-The bind address is fixed in code to loopback for this milestone. Origin validation also requires the configured local Host header. Changing an environment variable cannot open remote access.
+The bind address is fixed to loopback. Configuration cannot turn this into a public service. Add only domains you have permission to use as test targets; private/reserved IP results and non-HTTPS targets remain blocked.
 
-Frontend values live in `frontend/.env` and are embedded at build time:
+Frontend `frontend/.env` values are public and embedded at build time:
 
-| Variable           | Default                                                |
-| ------------------ | ------------------------------------------------------ |
-| `VITE_BACKEND_URL` | `http://127.0.0.1:4318`                                |
-| `VITE_BASE_PATH`   | `/`; use `/repository-name/` for a GitHub project page |
+| Variable           | Behavior                                                                                                  |
+| ------------------ | --------------------------------------------------------------------------------------------------------- |
+| `VITE_BACKEND_URL` | API origin; defaults to `http://127.0.0.1:4318`; HTTPS required for nonlocal hosts                        |
+| `VITE_BASE_PATH`   | Local setup uses `/`; production default is `/remote-browser/`; `build:pages` forces that repository path |
 
-**Every `VITE_` value is public.** Never place a secret or token there. Restart development servers after environment changes; rebuild before changing deployed frontend configuration.
+Never put `AUTH_SECRET` or bearer tokens in a `VITE_` variable. Tokens remain in tab memory, are never stored in local/session storage or URLs, and disappear on reload. Restart dev servers after configuration changes and rebuild static assets for deployment.
 
-The optional backend `BROWSER_CHANNEL` is `chromium` by default; `chrome` or `msedge` uses an installed browser with an isolated temporary profile. `PLAYWRIGHT_BROWSERS_PATH` can override the project browser cache location.
+## API and interactive protocol
 
-## API available in Phase 2
+All API calls require an allowed Origin. Protected HTTP routes also require `Authorization: Bearer <token>`. Errors use `{ error: { code, message } }`.
 
-All `/api` calls require an allowed `Origin` header. Protected calls additionally require `Authorization: Bearer <token>`. Tokens are returned only by login, never placed in URLs or persisted in browser storage. Authentication expires absolutely, without sliding renewal. A new login revokes the previous login.
+| Method | Route                        | Behavior                                           |
+| ------ | ---------------------------- | -------------------------------------------------- |
+| GET    | `/health`                    | Liveness without credentials                       |
+| POST   | `/api/auth/login`            | `{ secret }` returns token and expiration          |
+| POST   | `/api/auth/logout`           | Revoke token and close browser                     |
+| GET    | `/api/status`                | Browser status, capabilities, allowlist and expiry |
+| POST   | `/api/sessions`              | `{ viewport: { width, height } }` starts Chromium  |
+| DELETE | `/api/sessions/:id`          | Stop browser                                       |
+| POST   | `/api/sessions/:id/navigate` | `{ url }` navigates to a permitted page            |
+| GET    | `/api/sessions/:id/frame`    | Diagnostic JPEG endpoint with ETag/304             |
+| WS     | `/api/sessions/:id/stream`   | Authenticated display, input, resize and history   |
 
-| Method | Route                        | Behavior                                                                      |
-| ------ | ---------------------------- | ----------------------------------------------------------------------------- |
-| GET    | `/health`                    | Minimal liveness; no credential required                                      |
-| POST   | `/api/auth/login`            | `{ "secret": "..." }` → `{ token, expiresAt }`                                |
-| POST   | `/api/auth/logout`           | Revoke login; `204`                                                           |
-| GET    | `/api/status`                | Engine capabilities, allowlist, home URL, authentication expiry               |
-| POST   | `/api/sessions`              | `{ viewport: { width, height } }` → start Chromium, load home, return session |
-| DELETE | `/api/sessions/:id`          | Close the session and browser process; `204`                                  |
-| POST   | `/api/sessions/:id/navigate` | `{ url }` → validate, load and return updated session                         |
-| GET    | `/api/sessions/:id/frame`    | Authenticated JPEG; `ETag` enables `304` unchanged responses                  |
+WebSocket authentication is the first JSON message: `{ type: "auth", token }`, within five seconds. Commands have monotonically increasing positive IDs. Shared Zod schemas in `shared/src/index.ts` define input, navigation, viewport and response contracts. Binary frames contain a four-byte metadata length, JSON dimensions/revision/sequence, then JPEG bytes.
 
-Errors use `{ "error": { "code": "...", "message": "..." } }`. The API bounds request bodies at 8 KiB, login attempts at 5 per minute per client IP, and requests at 120 per minute per client IP. It does not trust forwarded client-IP headers.
+## Security and display
 
-## Security and display design
+Every document and subresource uses exact HTTPS URL checks, public-address DNS validation and a pinned numeric connection with hostname-verified TLS. Document redirects are checked hop by hop. A deny proxy blocks requests not fulfilled by the restricted backend fetcher. Chromium's sandbox remains enabled. Authentication expiry, replacement login, logout and shutdown tear down the browser.
 
-See [security boundaries](docs/security.md) and [Phase 2 enforcement](docs/phase-2.md). All document/subresource fetches validate exact HTTPS domains and public IP addresses, connect to a pinned numeric IP with hostname-verified TLS, and use resource/time limits. Document redirects are checked at every hop; redirecting subresources are blocked. A loopback deny proxy blocks Chromium requests not fulfilled by the backend. Scripts, service workers, downloads, browser WebSockets and permissions are disabled. This is a constrained read-only implementation, not a complete OS isolation guarantee; do not enable active browsing or remote access without the remaining security work.
-
-Phase 2 uses HTTP JPEG polling at up to 1 fps. Requests are sequential, paused in hidden tabs, and unchanged images return no body. This favors a small, testable implementation over low latency; it lacks smooth video, audio and semantic page accessibility. Phase 3 will add authenticated WebSockets and input. See [architecture](docs/architecture.md).
+The JPEG WebSocket display captures up to five frames per second during activity and one per second when idle. It suppresses unchanged frames, skips work under backpressure and pauses hidden tabs. This is straightforward to maintain but less efficient and smooth than video codecs; fine text can soften, and audio/video are unsupported. A bitmap viewport does not expose remote page semantics to assistive technology. See [architecture and transport](docs/architecture.md) and [security boundaries](docs/security.md).
 
 ## GitHub Pages
 
-The Vite build produces `frontend/dist`, independent of the backend. GitHub Pages hosts **only these static assets**; it cannot run Node.js, Playwright, Chromium, or WebSockets. A reachable frontend does not imply its backend connection is permitted or reachable. HTTPS Pages cannot be assumed to connect to an HTTP/private-network backend.
+`npm run build:pages` produces independently deployable `frontend/dist` assets. **GitHub Pages hosts only the static frontend. It cannot run Node.js, Playwright, Chromium or the WebSocket backend.** An accessible frontend does not mean its backend connection is reachable or permitted.
 
-A manual deployment workflow is included as scaffolding. No repository has been created, pushed, or deployed. Follow [GitHub publishing](docs/github-pages.md); remote backend networking and end-to-end deployment validation remain later milestones.
+The Pages workflow is manual. Publishing requires its explicit `publish` checkbox; ordinary pushes run checks only. No GitHub repository, remote, push, hosted workflow or deployment was created during this work. See [publishing instructions and network limitations](docs/github-pages.md).
 
-## Tests and progress
+## Project and verification
 
-Regular tests use Fastify's actual HTTP handler through injection and a DOM test environment. `npm run test:browser` uses real Chromium with an isolated local website. `npm run smoke` starts real servers on loopback and tests the rendered frontend, a separate remote Chromium process, navigation, the image viewport and reconnection. Test-only fixture mapping is injected internally; no production option permits loopback target browsing. Output screenshots are ignored by Git.
+```text
+frontend/              React interface, input mapping, stream/API clients, Vite config
+backend/               API, auth, stream hub, Chromium engine, restricted fetcher
+shared/                Runtime schemas, binary-frame format and TypeScript types
+tests/                 Unit, API, DOM, WebSocket and real Chromium tests
+scripts/               Setup, browser install, smoke, profile and Pages verification
+docs/                  Windows setup, security, architecture, phases and deployment
+.github/workflows/     Windows/Linux checks and manual Pages preparation/deployment
+```
 
-See [recorded verification](docs/verification.md) and [milestones and remaining work](docs/phases.md). Phase 2 is implemented; Phase 3 adds input and streaming; Phase 4 expands security/recovery for active browsing; Phase 5 expands failure/performance tests; Phase 6 validates deployment. The full production application is not complete.
+Verified locally: **149 unit/API/frontend tests**, **nine real-browser tests**, interactive UI smoke, retained-memory profiling, production builds, formatting and dependency audit. The final Pages-path smoke is recorded in [verification](docs/verification.md). Earlier phase failures were fixed; there are no known remaining failing tests. This is not a security audit or a guarantee for arbitrary websites.
+
+Read [Windows setup](docs/windows-setup.md), [troubleshooting](docs/troubleshooting.md), [phase history](docs/phases.md), and the [final delivery report](docs/final-report.md).

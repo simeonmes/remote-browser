@@ -1,38 +1,44 @@
-# Architecture and next-stage contracts
+# Architecture
 
-## Current application
+## Components
 
 ```text
-React / Vite (127.0.0.1:5173)
-   └─ HTTP JSON + bearer token in header
-      └─ Fastify (127.0.0.1:4318)
-         ├─ Host/origin checks and rate limits
-         ├─ Single-login auth with absolute expiry
-         ├─ Shared Zod request contracts
-         ├─ Status and health
-         └─ Playwright → ephemeral Chromium context → JPEG frames
-            └─ Intercepted resources → public-IP-pinned HTTPS fetcher
-               Unhandled browser egress → localhost deny proxy
+React / Vite static frontend
+  HTTP JSON + bearer header; authenticated WebSocket + binary JPEG
+    Fastify on 127.0.0.1:4318
+      Host / Origin validation, rate limits, one expiring login
+      StreamHub: one active controller, bounded queues and heartbeats
+      PlaywrightEngine: one ephemeral Chromium context and page
+        resource interception -> validated, public-IP-pinned HTTPS fetcher
+        unhandled requests -> loopback deny proxy (never forwards)
 ```
 
-Frontend and backend are npm workspaces. `shared` owns runtime request/response schemas and inferred TypeScript types. The frontend parses received responses instead of trusting a TypeScript cast. The backend is created independently of its listener for deterministic API tests. Only `server.ts` loads environment files and opens a listener. Setup and test fixtures never print secrets.
+The shared workspace owns Zod schemas, inferred TypeScript types and binary-frame encoding. The backend is built separately from its listener for API tests. Only `server.ts` loads environment files and binds the application listener. No debugging listener is opened; Chromium control uses Playwright's private pipe.
 
-Connection polling starts after login, runs every 2 seconds while healthy, and backs off from 2 seconds to at most 30 seconds after failures. Network failures retain the in-memory token so retry can recover; `401` clears it and returns to login. Unmounting or signing out aborts outstanding status requests. Ordinary client requests time out after 8 seconds; startup allows 45 seconds and navigation 40. Backend restart loses the token and requires another login.
+## Lifecycle and input
 
-## Implemented browser lifecycle and display
+Start creates one isolated browser. Overlapping operations are rejected or serialized through the stream queue. Generation checks fence cancelled startup, navigation and screenshot results. Navigation errors can be retried; a browser crash requires Stop then Start. Logout, replacement login, expiry and normal shutdown close the browser. The browser context never inherits personal cookies or profiles.
 
-One ephemeral browser context/page belongs to the active authenticated user. Duplicate starts and overlapping navigation operations are rejected. Generation checks cancel stopped startups and late results. Logout, replacement login, auth expiry and normal shutdown close the browser. Page crash/disconnection produces a failed session with an explicit stop/start recovery path. Navigation failures can be retried. The Phase 2 image endpoint sends JPEGs with conditional ETags; polling is sequential, at most 1 fps, and pauses in hidden/disconnected tabs. See [Phase 2](phase-2.md) for resource limits and the pinned fetching design.
+The control interface maps pointer coordinates from the rendered image to its actual dimensions. A frame revision changes on navigation/resize; old-image input is rejected. Keyboard input is confined to the focused viewport, with text paste and a mobile text field. Native pointer input uses a private CDP session because Playwright drag detection stalls with page scripts disabled. Only fixed, validated input commands reach that channel; clients cannot send arbitrary CDP commands.
 
-## Planned Phase 3 display transport
+Links and native GET forms re-enter the same validated navigation path as the address bar. Back/Forward use a bounded 100-URL history, reloading documents rather than restoring form state or scroll position. Resource fetching allows GET documents, CSS, images and fonts. Scripts, service workers, browser WebSockets, POST, forwarded cookies, downloads and popups remain disabled.
 
-Use Playwright screenshots encoded as JPEG and sent as binary WebSocket messages, alongside versioned JSON control/status messages. Start with a modest 5–10 fps ceiling and adjustable image quality. Capture only one frame at a time; do not accumulate screenshots. Skip unchanged frames using a digest, pause for disconnected/hidden clients, and drop stale frames if `bufferedAmount` exceeds a bound. Include viewport dimensions and frame sequence IDs to avoid clicks being mapped against stale sizes.
+## Display and tradeoffs
 
-JPEG-over-WebSocket keeps implementation and failure recovery understandable and works without a WebRTC signaling stack. It consumes more CPU and bandwidth than a tuned video codec, lacks native video congestion control, and will not provide smooth video/audio streaming. JPEG also softens fine text. PNG would improve text at a bandwidth cost. An image viewport does not expose remote semantic accessibility, native text selection, clipboard, audio, IME, or file transfers automatically; these need separate design and tests.
+Each binary WebSocket frame contains a four-byte big-endian JSON header length, bounded metadata (sequence, revision, width, height) and JPEG data. The client validates metadata and JPEG framing before creating a blob URL. At most two image URLs are retained, with cleanup when the stream ends.
 
-Input JSON will validate mouse coordinates, buttons, keyboard events, scroll deltas and viewport size; coordinates must be mapped from displayed image bounds into captured viewport pixels. Focus handling must prevent shortcuts from stealing input while typing in the local address bar. Remote resizing must be debounced and bounded. A single-use WebSocket authorization mechanism must be added before opening streaming endpoints.
+Capture is capped at 5 fps during activity and 1 fps after two idle seconds. Only one screenshot runs at a time; concurrent requests share it. A short cache avoids redundant captures. Image digests suppress unchanged payloads. Hidden clients pause capture; high buffered amounts skip capture/transmission. Input movement is throttled, wheel input coalesced, resize debounced. The HTTP ETag frame route remains available for diagnostics.
 
-## Static hosting boundary
+JPEG/WebSocket avoids a video encoder, signaling service and WebRTC transport complexity. Its cost is higher CPU/bandwidth per moving frame, lower motion smoothness and softer text than an optimized video stream. There is no audio. A bitmap also lacks semantic accessibility and remote clipboard readback. These are intentional prototype limits, not features implied by a browser-looking interface.
 
-Vite emits only static frontend assets. API URLs are configurable build-time origins, not server-side secrets. There is no implicit same-origin proxy. GitHub Pages cannot execute the backend. Network permission, backend reachability, TLS, CORS, and browser private-network restrictions are separate concerns.
+## Reconnection
 
-Implementation references: [Vite static deployment](https://vite.dev/guide/static-deploy.html), [Tailwind Vite integration](https://tailwindcss.com/docs/installation/using-vite), and [Fastify validation](https://fastify.dev/docs/latest/Reference/Validation-and-Serialization/).
+HTTP status polling detects backend outages, backing off to 30 seconds. A 401 clears login. Stream retries back off to ten seconds; terminal authentication/session/controller errors stop retries. Pending input is rejected and never replayed. Reconnecting to an existing session never starts a duplicate browser. Browser restarts invalidate tokens and require login again.
+
+The server authenticates every command and rechecks after asynchronous work. Native ping/pong and JSON heartbeats detect broken connections. One controller replaces another; hidden/disconnected controllers release held buttons. Absolute expiration is not extended by activity.
+
+## Static hosting
+
+The production build contains only frontend assets and a content policy restricting script and connection sources. GitHub Pages cannot execute backend code. API origin configuration is public, and the backend remains independently operated. Network authorization, TLS, reachability, Origin validation and browser private-network rules are independent requirements.
+
+Implementation references: [Playwright CDPSession](https://playwright.dev/docs/api/class-cdpsession), [Chromium input protocol](https://chromedevtools.github.io/devtools-protocol/tot/Input/), [Vite static deployment](https://vite.dev/guide/static-deploy), and [GitHub Pages workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).

@@ -1,41 +1,60 @@
-# GitHub and Pages publishing
+# GitHub Pages preparation and publishing
 
-GitHub Pages serves the static React application in `frontend/dist`. It cannot run this project's backend or Chromium. The Phase 2 backend is intentionally limited to localhost, so publishing the interface does **not** create a remote-browser service. Remote backend setup and permission must be handled separately in later phases.
+The static React frontend is ready to build at **/remote-browser/**. GitHub Pages cannot run the Node/Playwright backend, Chromium or the WebSocket server. The checked-in backend is intentionally loopback-only. Publishing the frontend alone does not enable access from other devices or grant network permission.
 
-## Publish source
+## Verify locally without publishing
 
-After reviewing the files and completing local checks, create an empty repository on GitHub and run these PowerShell commands yourself:
+Stop development servers so ports 4318 and 5173 are free, then run:
 
 ```powershell
-git init
-git add .
-git status # Verify no .env, browser profile, cache, or credential is staged.
-git commit -m "Add remote browser application foundation"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPOSITORY.git
+npm run check
+npm run build:pages
+npm run smoke:pages
+```
+
+The Pages build command forces `/remote-browser/` even if your local `frontend/.env` uses `/`. It verifies asset paths, asset existence, production CSP, excluded backend artifacts and absence of your local access key. The smoke test serves that build locally and exercises real browser input, navigation and reconnects. Neither command publishes anything.
+
+To preview manually, start the built backend in one terminal and the frontend in another:
+
+```powershell
+npm run build
+npm run build:pages
+npm start
+# Second terminal:
+npm run preview:frontend
+```
+
+Open `http://127.0.0.1:5173/remote-browser/`. Local preview uses the existing allowed origin.
+
+## Publish source when approved
+
+Local Git commits already record each completed phase; there is no configured remote. Create a GitHub repository named `remote-browser` only when you are ready, then review:
+
+```powershell
+git status
+git log --oneline
+git remote add origin https://github.com/YOUR_USERNAME/remote-browser.git
 git push -u origin main
 ```
 
-The application setup does not initialize, commit, push, or create a GitHub repository automatically.
+Do not upload `.env`, browser profiles, caches, screenshots or credentials. The repository ignores them. The staged-secret helper supplements review: `node scripts/check-staged-secrets.mjs`. Use your own Git identity for future commits; the autonomous phase commits use a local development identity.
 
-## Build for a project page
+## Manual deployment workflow
 
-```powershell
-$env:VITE_BASE_PATH = "/YOUR_REPOSITORY/"
-# Later, after configuring an authorized TLS backend:
-$env:VITE_BACKEND_URL = "https://YOUR_AUTHORIZED_BACKEND"
-npm run build
-```
+1. In repository Settings / Pages, choose GitHub Actions as the publishing source.
+2. Set the repository Actions variable `VITE_BACKEND_URL` to the intended API origin. This value is public. A localhost value produces a same-machine preview, not a remote backend deployment.
+3. Review `.github/workflows/pages.yml`. The workflow checks/tests/builds, then uploads only `frontend/dist`. It has no push deployment trigger.
+4. Run **Deploy static frontend** with **publish unchecked** for an artifact-only run.
+5. Only when you approve public publication, run it with **publish checked**. The deploy job uses the `github-pages` environment; configure a required reviewer there if desired and available for your repository.
 
-Use `/` for `YOUR_USERNAME.github.io` repositories or a custom root domain. All `VITE_` values are embedded in the bundle and must contain no secrets. `ALLOWED_ORIGINS` on the backend would need the **origin** `https://YOUR_USERNAME.github.io`, without the repository path. CORS and hosting configuration do not grant network permission.
+No workflow was run and no public deployment was performed during implementation. Hosted CI and actual Pages delivery remain externally unverified. The regular checks workflow runs on Windows and Ubuntu; its browser job tests Windows Chromium and both root/repository-path previews.
 
-## Manual Actions workflow
+The repository path follows [Vite's project-page guidance](https://vite.dev/guide/static-deploy). The workflow uses GitHub's configure/upload/deploy actions and limited job permissions as described in [GitHub's custom workflow documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages). If you rename the repository or use a root/custom domain, change the dedicated Pages build path and verification script together.
 
-1. In GitHub repository **Settings → Pages**, choose **GitHub Actions** as the source.
-2. Add repository Actions variable `VITE_BASE_PATH`, e.g. `/remote-browser/` or `/`.
-3. Add repository Actions variable `VITE_BACKEND_URL` for the permitted backend origin. During local-only development a loopback value produces a frontend preview only; it is not a remote deployment.
-4. Open **Actions → Deploy static frontend → Run workflow**. The workflow checks and builds, uploads only `frontend/dist`, and deploys it to Pages. Deployment is manual, never triggered by a regular push.
+## Backend operation and network approval
 
-Do not add `AUTH_SECRET` as a frontend variable or build secret; users enter their key at runtime. The workflow has only the GitHub permissions needed for Pages and reading source. The regular CI workflow runs on Windows and Ubuntu, but those hosted jobs have not been run merely by creating these files.
+Keep the backend on the HP Victus. Start it with `npm run build` then `npm start`; keep the laptop awake while using it. Its authentication key belongs only in `backend/.env`, never GitHub Pages build variables. Restarting the backend ends all sessions.
 
-An HTTPS Pages origin cannot be assumed to access an HTTP/private-network backend: mixed-content rules, private-network access controls, DNS, routing, TLS trust, CORS, and organization policies all apply. Do not bypass those protections. A valid later deployment needs permitted HTTPS/WSS connectivity to the backend. See [Vite's Pages guidance](https://vite.dev/guide/static-deploy.html#github-pages).
+A future remote deployment needs explicit permission, permitted routing, trusted HTTPS/WSS, restricted inbound access, and reviewed Host/Origin validation. The current server rejects nonlocal Host headers and does not bind remote interfaces. Those settings have deliberately not been loosened. Do not simply replace the URL and assume remote access works.
+
+An HTTPS frontend may be blocked from an HTTP/private-network backend by browser protections or network policy. Do not disable those protections, TLS validation, firewall rules or administrator restrictions. An allowlisted frontend Origin is an authentication defense, not network authorization. The correct Pages Origin is `https://YOUR_USERNAME.github.io`, without the repository path, when a separately approved backend deployment is ready.

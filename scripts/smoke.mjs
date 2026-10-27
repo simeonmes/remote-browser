@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { preview } from 'vite';
 import { buildApp } from '../backend/dist/app.js';
@@ -13,7 +13,8 @@ const root = new URL('../', import.meta.url);
 process.env.PLAYWRIGHT_BROWSERS_PATH ??= fileURLToPath(new URL('../.playwright', import.meta.url));
 const { chromium } = await import('playwright');
 const channel = process.env.SMOKE_BROWSER_CHANNEL;
-const base = process.env.VITE_BASE_PATH || '/';
+const html = await readFile(new URL('../frontend/dist/index.html', import.meta.url), 'utf8');
+const base = html.match(/src="([^"]*)assets\//)?.[1] || '/';
 if (channel && !['chrome', 'msedge'].includes(channel))
   throw new Error('SMOKE_BROWSER_CHANNEL must be chrome or msedge.');
 const secret = randomBytes(32).toString('hex');
@@ -145,11 +146,16 @@ try {
     mobilePanelWidths.every((width) => width >= 350),
     'Mobile connection panels must fill the available width.',
   );
+  await until(
+    async () =>
+      engine.status().viewport.width < 400 &&
+      (await remoteFrame.evaluate((image) => image.naturalWidth)) ===
+        engine.status().viewport.width,
+  );
   await page.screenshot({
     path: fileURLToPath(new URL('test-results/mobile.png', root)),
     fullPage: true,
   });
-  await until(() => engine.status().viewport.width < 400);
   console.log(
     'PASS: real mouse, keyboard, scrolling, history, responsive resize; Chromium viewport, start/navigation/home, URL rejection, desktop/mobile layout, and memory-only credentials.',
   );

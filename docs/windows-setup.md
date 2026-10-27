@@ -33,4 +33,6 @@ Run `npm run test:browser` and `npm run smoke` after installing the managed brow
 
 If a restricted automation runner causes `browserContext.newPage: Target crashed`, run the development command/tests from your ordinary VS Code PowerShell terminal. Do not disable Chromium's sandbox as a workaround. The checked-in engine enables it explicitly.
 
-Never put `AUTH_SECRET` in `frontend/.env`. Never use a `--host 0.0.0.0` override to make the application remote without completing the remaining security work and explicitly authorizing network exposure.
+Never put `AUTH_SECRET` in `frontend/.env`. Never use a `--host 0.0.0.0` override to make the application remote without a separately reviewed and explicitly authorized network deployment.
+
+For a GitHub Pages-style local preview, run `npm run build:pages`, start the backend with `npm start`, then run `npm run preview:frontend` in a second terminal. Open `http://127.0.0.1:5173/remote-browser/`. This publishes nothing. See [publishing instructions](github-pages.md).

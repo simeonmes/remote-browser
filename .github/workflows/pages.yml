@@ -1,6 +1,12 @@
 name: Deploy static frontend
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'I approve publishing the static frontend to GitHub Pages'
+        type: boolean
+        required: true
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -10,7 +16,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VITE_BASE_PATH: ${{ vars.VITE_BASE_PATH }}
       VITE_BACKEND_URL: ${{ vars.VITE_BACKEND_URL }}
     steps:
       - uses: actions/checkout@v4
@@ -21,15 +26,18 @@ jobs:
       - name: Require explicit deployment configuration
         shell: bash
         run: |
-          test -n "$VITE_BASE_PATH" || { echo 'Set the VITE_BASE_PATH repository variable.'; exit 1; }
           test -n "$VITE_BACKEND_URL" || { echo 'Set the VITE_BACKEND_URL repository variable.'; exit 1; }
       - run: npm ci
       - run: npm run check
+      - run: npm run format:check
+      - run: npm run build:pages
       - uses: actions/configure-pages@v5
+        if: ${{ inputs.publish }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: frontend/dist
   deploy:
+    if: ${{ inputs.publish }}
     needs: build
     runs-on: ubuntu-latest
     permissions:

@@ -1,55 +1,46 @@
 # Verification
 
-## Phase 2
+## Final local verification — October 27, 2026
 
-Implemented and checked locally on Windows with Node.js 24.18.0 and managed Chromium 156.0.8078.4. The public test loaded `https://example.com/` through the production fetcher, reported `Example Domain`, and generated a 15,735-byte JPEG. The screenshot was inspected.
+Environment: Windows, Node.js 24.18.0, npm 11.16.0, Playwright-managed Chromium 156.0.8078.4. Chromium's sandbox remained enabled. Browser tests used normal Windows process permissions because the restricted automation runner crashes sandboxed renderers; no Windows security settings were changed.
 
-The unit/API/UI suite includes private-address classes, DNS pinning and rebinding rejection, session APIs, conditional frames, expiry teardown and rejection of an in-flight frame after logout. The separate real-Chromium suite exercises an isolated local fixture: rendering/CSS, disabled scripts, blocked targets, actual JPEG output, concurrent starts, start cancellation, redirects, browser failure/restart and authenticated frame delivery/logout. The built frontend smoke check passed actual start, navigation, Home, denied URLs, mobile/desktop rendering, stop and reconnect behavior with no browser JavaScript errors.
+| Check                                      | Result                                                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `npm run check`                            | Passed: strict types, 149 unit/API/frontend/protocol tests, all production builds                       |
+| `npm run test:browser`                     | Passed: nine tests across two real Chromium suites                                                      |
+| `npm run smoke`                            | Passed: real pointer/text/scroll/history/resize, navigation, desktop/mobile, backend restart and logout |
+| `npm run profile`                          | Passed: ten warmed browser cycles; 1.99 MiB retained heap, below the 16 MiB smoke budget                |
+| `npm run build:pages`                      | Passed: repository-path assets, referenced files, content policy and local-secret exclusion             |
+| `npm run smoke:pages`                      | Passed: the same real UI checks served at `/remote-browser/`                                            |
+| `npm run format:check`                     | Passed                                                                                                  |
+| `npm audit --omit=dev --audit-level=high`  | Zero known production dependency vulnerabilities                                                        |
+| Project Chromium process check after tests | Zero remaining managed Chromium processes                                                               |
+| Phase Git commits                          | Staged secret/artifact checks passed before each commit                                                 |
 
-Final results: **106 unit/API/UI tests passed**, **6 real-Chromium integration tests passed**, the end-to-end smoke check passed, strict type checks and production builds passed, formatting passed, and `npm audit --omit=dev` reported zero known vulnerabilities. Commands: `npm run check`, `npm run test:browser`, `npm run smoke`, `npm run format:check`. Browser tests run with Chromium's sandbox enabled and normal Windows process permissions; the restricted runner could launch Chromium but crashed its sandboxed renderer. No OS security settings were changed.
+Tests cover authentication/absolute expiry/revocation, strict URL and IP validation, DNS pinning and rebinding rejection, API failures, conditional JPEGs, session cancellation and crash recovery, native GET forms, URL fragments, input coordinate scaling, stale-frame rejection, stream authentication and origin checks, rate/size limits, duplicate commands, controller takeover, backpressure, unchanged-frame suppression, repeated socket cleanup, reconnect without replay, browser cleanup and frontend observer/timer disposal.
 
-Not yet implemented/verified: mouse/keyboard/scrolling, history, dynamic resizing, active page scripts, WebSocket streaming, actual GitHub Actions/Pages deployment, or remote-device access. See [Phase 2 details](phase-2.md). The app is restarted on localhost after verification for manual use.
+Capture measurements at 1280×720: 20 samples, 35 ms median / 111 ms p95 input-to-capture, 19,028 mean JPEG bytes. These measure the local fixture, excluding network transit and frontend decoding. Heap profiling uses explicit GC after warming the runtime; it is a short retention check, not a long-term leak proof. See [Phase 5 measurements](phase-5.md).
 
-## Historical Phase 1 results
+Earlier test failures were fixed: native pointer drag detection with scripts disabled, rejected-upgrade socket cleanup, fragment routing, resize retry, and stale Phase 2 UI text. There are no known remaining failing tests.
 
-Verified locally on Windows on 2026-10-26 with Node.js 24.18.0 and npm 11.16.0.
+## What has not been claimed
 
-| Check                                           | Result                                                                                            |
-| ----------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Strict TypeScript checks                        | Passed for frontend, backend, shared contracts, and tests                                         |
-| Automated suite                                 | 72 tests passed across 5 files                                                                    |
-| Production builds                               | Shared package, backend, and frontend built successfully                                          |
-| Formatting                                      | Prettier check passed                                                                             |
-| Dependency audit after final dependency changes | npm reported 0 known vulnerabilities                                                              |
-| Real-browser test using installed Chrome        | Passed with a temporary profile; no page JavaScript errors                                        |
-| Desktop and mobile screenshots                  | Inspected at 1440px and 390px widths; corrected mobile panel sizing                               |
-| Actual login/logout and CORS                    | Passed through the rendered application and real localhost API                                    |
-| Backend outage/restart                          | UI detected disconnection, rejected the old login after restart, and reauthenticated successfully |
-| Credential persistence                          | Browser localStorage and sessionStorage remained empty                                            |
-| Pages-style base path                           | Production frontend loaded and passed smoke checks at `/remote-browser/`                          |
-| Documented development command                  | `npm run dev` started both servers; frontend HTTP 200 and backend health response verified        |
-| Listener addresses                              | Confirmed `127.0.0.1:5173` and `127.0.0.1:4318`                                                   |
+Actual GitHub-hosted Actions, Pages delivery, remote-device access, third-party JavaScript applications, long-running memory stability and independent security auditing have not been verified. Public deployment and remote network configuration were not performed. The backend remains on loopback.
 
-The first development watcher (`tsx`) failed on a restricted Windows OS user-information call. It was replaced with TypeScript compilation watch plus Node's native watcher. The final command was verified with normal local process permissions. The verification processes were stopped after testing.
+Historical implementation details are in [Phase 2](phase-2.md), [Phase 3](phase-3.md), [Phase 4](phase-4.md), [Phase 5](phase-5.md), and [Phase 6](phase-6.md).
 
-To repeat the primary checks:
+## Reproduce
 
 ```powershell
+npm ci
+npm run browser:install
 npm run check
+npm run test:browser
+npm run smoke
+npm run profile
+npm run smoke:pages
 npm run format:check
-$env:SMOKE_BROWSER_CHANNEL = "chrome"
-npm run smoke
+npm audit --omit=dev --audit-level=high
 ```
 
-To repeat the Pages-path smoke check:
-
-```powershell
-$env:VITE_BASE_PATH = "/remote-browser/"
-npm run smoke
-Remove-Item Env:VITE_BASE_PATH
-npm run build -w frontend
-```
-
-Screenshots are written to ignored `test-results/desktop.png`, `connected.png`, and `mobile.png`. Smoke tests require ports 4318 and 5173 to be free and default localhost frontend configuration. They create their own ephemeral authentication key and never read or print the configured local key.
-
-Not verified or implemented: remote Chromium sessions, target navigation, browser input, WebSocket display, browser-level SSRF enforcement, remote-device access, the later local test-website integration, or actual GitHub Actions/Pages deployment. The smoke test browser renders the control interface; it is not the remote browser engine.
+Stop development servers before smoke tests. Screenshots and reports are written to ignored `test-results/`. Tests generate temporary credentials and do not read or print your configured access key, except the artifact verifier compares the key internally to confirm it is absent from static files.
