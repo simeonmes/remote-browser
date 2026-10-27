@@ -9,8 +9,8 @@ React / Vite static frontend
       Host / Origin validation, rate limits, one expiring login
       StreamHub: one active controller, bounded queues and heartbeats
       PlaywrightEngine: one ephemeral Chromium context and page
-        resource interception -> validated, public-IP-pinned HTTPS fetcher
-        unhandled requests -> loopback deny proxy (never forwards)
+        public mode -> loopback HTTP/CONNECT guard -> pinned public IP
+        allowlist mode -> restricted HTTPS fetcher + deny proxy
 ```
 
 The shared workspace owns Zod schemas, inferred TypeScript types and binary-frame encoding. The backend is built separately from its listener for API tests. Only `server.ts` loads environment files and binds the application listener. No debugging listener is opened; Chromium control uses Playwright's private pipe.
@@ -21,7 +21,9 @@ Start creates one isolated browser. Overlapping operations are rejected or seria
 
 The control interface maps pointer coordinates from the rendered image to its actual dimensions. A frame revision changes on navigation/resize; old-image input is rejected. Keyboard input is confined to the focused viewport, with text paste and a mobile text field. Native pointer input uses a private CDP session because Playwright drag detection stalls with page scripts disabled. Only fixed, validated input commands reach that channel; clients cannot send arbitrary CDP commands.
 
-Links and native GET forms re-enter the same validated navigation path as the address bar. Back/Forward use a bounded 100-URL history, reloading documents rather than restoring form state or scroll position. Resource fetching allows GET documents, CSS, images and fonts. Scripts, service workers, browser WebSockets, POST, forwarded cookies, downloads and popups remain disabled.
+Public mode uses Chromium?s native navigation/history, JavaScript, GET/POST forms, cookies and WebSockets. Address-bar text becomes a configured search-provider query; bare hostnames default to HTTPS. A new-window link replaces the visible page, with one pending popup admitted at a time. The network guard validates all DNS results and pins each outgoing connection; HTTPS remains encrypted between Chromium and the destination.
+
+Allowlist mode retains the original GET-only fetcher, disabled scripts/cookies/WebSockets and bounded 100-URL history. Both modes use disposable contexts, block service workers, cancel downloads, dismiss dialogs and retain Chromium?s sandbox. See [public-mode networking](public-browsing.md).
 
 ## Display and tradeoffs
 

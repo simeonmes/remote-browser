@@ -28,6 +28,8 @@ export const statusSchema = z.strictObject({
     display: z.literal(true),
     input: z.literal(true),
   }),
+  browsingMode: z.enum(['public', 'allowlist']),
+  searchProvider: z.enum(['google', 'duckduckgo']),
   allowedDomains: z.array(z.string()),
   homeUrl: z.url(),
   authExpiresAt: z.number().int(),

@@ -71,7 +71,11 @@ describe('configuration', () => {
   });
   it('rejects a home URL outside the allowlist', () => {
     expect(() =>
-      parseConfig({ AUTH_SECRET: secret, HOME_URL: 'https://other.example.com/' }),
+      parseConfig({
+        AUTH_SECRET: secret,
+        BROWSING_MODE: 'allowlist',
+        HOME_URL: 'https://other.example.com/',
+      }),
     ).toThrow();
   });
 });

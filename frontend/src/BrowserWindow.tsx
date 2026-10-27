@@ -23,6 +23,7 @@ import type {
   NavigationAction,
 } from '@remote-browser/shared';
 import { RemoteApi } from './api';
+import { resolveAddress } from './address';
 import { RemoteViewport } from './RemoteViewport';
 import { RemoteStream } from './remote-stream';
 
@@ -147,7 +148,11 @@ export function BrowserWindow({
         await api.stopBrowser(token, session.id, controller.signal);
         if (!controller.signal.aborted) onSession(null);
       } else if (session) {
-        const next = await api.navigate(token, session.id, url, controller.signal);
+        const target =
+          status?.browsingMode === 'public'
+            ? resolveAddress(url, status.searchProvider)
+            : url.trim();
+        const next = await api.navigate(token, session.id, target, controller.signal);
         if (!controller.signal.aborted) onSession(next);
       }
     } catch (cause) {
@@ -222,13 +227,17 @@ export function BrowserWindow({
             void act('navigate');
           }}
         >
-          <LockKeyhole size={14} />
+          {session?.url.startsWith('http:') ? <Globe2 size={14} /> : <LockKeyhole size={14} />}
           <input
             aria-label="Address bar"
             disabled={!canNavigate}
             value={address}
             onChange={(event) => setAddress(event.target.value)}
-            placeholder="Connect to open a permitted test page"
+            placeholder={
+              status?.browsingMode === 'public'
+                ? 'Search the web or enter a website'
+                : 'Enter a permitted HTTPS URL'
+            }
             maxLength={2048}
           />
           <button className="address-go" aria-label="Navigate" disabled={!canNavigate}>
@@ -306,7 +315,9 @@ export function BrowserWindow({
               </h2>
               <p>
                 {token
-                  ? 'Start an isolated browser and view your permitted test page. Click the live page to use your mouse and keyboard. Page scripts remain disabled.'
+                  ? status?.browsingMode === 'public'
+                    ? 'Search the web, open websites, and use your mouse and keyboard in an isolated Chromium session.'
+                    : 'Open a permitted test page. This restricted mode keeps page scripts disabled.'
                   : 'Connect to your local backend to get started. Your browsing session will run on your HP Victus.'}
               </p>
               {!token ? (
@@ -336,7 +347,8 @@ export function BrowserWindow({
               )}
               <div className="viewport-assurances">
                 <span>
-                  <Check size={13} /> Allowlisted domains
+                  <Check size={13} />{' '}
+                  {status?.browsingMode === 'public' ? 'Public websites' : 'Allowlisted domains'}
                 </span>
                 <span>
                   <Check size={13} /> Single-user access
@@ -371,8 +383,8 @@ export function BrowserWindow({
       </div>
       {session && (
         <div className="display-caption">
-          {session.viewport.width} × {session.viewport.height} · Up to 5 fps while active · Page
-          scripts disabled
+          {session.viewport.width} × {session.viewport.height} · Up to 5 fps while active ·{' '}
+          {status?.browsingMode === 'public' ? 'JavaScript enabled' : 'Page scripts disabled'}
         </div>
       )}
     </section>

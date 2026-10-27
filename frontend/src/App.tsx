@@ -285,20 +285,34 @@ export default function App({ api }: { api: RemoteApi }) {
                 </span>
                 <h2>Access policy</h2>
               </div>
-              <p className="panel-description">A small, intentional browsing space.</p>
+              <p className="panel-description">Your browser, with private-network protection.</p>
               <div className="policy-row">
                 <span>Browsing scope</span>
-                <strong>Allowlist only</strong>
+                <strong>
+                  {status?.browsingMode === 'public' ? 'Public web' : 'Allowlist only'}
+                </strong>
               </div>
               <div className="policy-row">
                 <span>Active users</span>
                 <strong>Just you</strong>
               </div>
               <div className="domain-section">
-                <span className="field-label">Permitted test domains</span>
+                <span className="field-label">
+                  {status?.browsingMode === 'public'
+                    ? 'Browsing settings'
+                    : 'Permitted test domains'}
+                </span>
                 {status ? (
                   <div className="domain-list">
-                    {status.allowedDomains.map((domain) => (
+                    {(status.browsingMode === 'public'
+                      ? [
+                          'HTTP / HTTPS',
+                          status.searchProvider === 'google'
+                            ? 'Google search'
+                            : 'DuckDuckGo search',
+                        ]
+                      : status.allowedDomains
+                    ).map((domain) => (
                       <span key={domain}>
                         <Globe2 size={12} />
                         {domain}
@@ -306,7 +320,7 @@ export default function App({ api }: { api: RemoteApi }) {
                     ))}
                   </div>
                 ) : (
-                  <p className="field-help">Connect to view your backend’s allowlist.</p>
+                  <p className="field-help">Connect to view your browsing settings.</p>
                 )}
               </div>
               <div className="policy-note">

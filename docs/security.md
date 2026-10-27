@@ -7,12 +7,20 @@
 - Random setup-generated access key, constant-time comparison of its digest, cryptographically random bearer tokens, and server-side token digests. One active login with absolute expiry; login replaces the old token; logout and server shutdown invalidate it.
 - Frontend key cleared on submission; token held only in component memory, never local/session storage, cookies, URLs, or build configuration. Reload requires another login.
 - Strict input schemas, maximum viewport dimensions, 8 KiB bodies, rate limits, untrusted forwarded headers, non-caching responses, Helmet headers, and sanitized errors. Logs do not include request bodies or authorization headers. Login is limited to 5 requests/minute even with invalid bodies.
-- URLs must be HTTPS, default port 443, no credentials, and exactly match a permitted domain. IP literals, wildcard allowlists, and common internal-domain suffixes are rejected.
-- Target requests use the restricted Phase 2 fetcher below. No browser debugging port, remote access setup, forwarding proxy, tunnel, or firewall changes.
+- Public-mode URLs must use HTTP port 80 or HTTPS port 443 without embedded credentials. Private/reserved DNS answers, IP literals and common internal-domain suffixes are rejected. Allowlist mode additionally requires HTTPS and an exact permitted domain.
+- Public mode uses a browser-only loopback egress proxy; allowlist mode uses the restricted Phase 2 fetcher below. No public proxy listener, browser debugging port, remote access setup or firewall changes.
 
 Origin and Host checks supplement authentication; non-browser clients can forge these headers. CORS is not authentication. Localhost is a network boundary, not protection from malicious software already executing as the same Windows user. Bearer-token theft permits access until expiry/revocation. Avoid browser extensions you do not trust.
 
-## Phase 2 browser enforcement
+## Public-mode browser enforcement
+
+Chromium uses an ephemeral loopback HTTP/CONNECT proxy. Every new outgoing connection resolves the target, rejects the entire answer set if any address is non-public, and connects to a validated numeric address. The proxy cannot use a hostname for its upstream socket, preventing a second DNS lookup from rebinding the destination. Redirect destinations and WebSockets cross this same guard. Chromium validates upstream HTTPS certificates normally; the proxy does not decrypt HTTPS. QUIC and non-proxied WebRTC UDP are disabled; the loopback proxy bypass is explicitly removed. Service workers remain blocked.
+
+Native cookies, scripts, request methods and headers work in the disposable browser context. They never inherit your normal browser profile. HTTP proxy credentials and hop-by-hop headers are stripped from forwarded HTTP requests. Socket counts, DNS/connect/idle timeouts and a 512 MiB session traffic budget bound resource use; counted traffic includes both proxy legs. HTTP request bodies are limited to 8 MiB; encrypted HTTPS payloads are not inspected and share the session byte budget. Stop/start resets the budget.
+
+This is application-level network protection, not OS isolation or a guarantee against Chromium vulnerabilities. Active website code is a broader attack surface than allowlist mode. No TLS verification, browser sandbox or Windows protection is disabled. Local test fixtures inject DNS/dial dependencies in code only; no production setting or API enables private-address access.
+
+## Original Phase 2 enforcement (allowlist mode only)
 
 A URL allowlist by itself is insufficient: permitted domains can resolve to private addresses or redirect elsewhere. Phase 2 therefore fetches resources through Node, validates all DNS answers as public unicast, and pins the numeric IP used by the HTTPS connection. TLS verifies the original hostname and certificate chain. Every new resource and each document redirect hop repeats these checks. Bodies, concurrency, redirect count and session budgets are bounded.
 
@@ -20,7 +28,7 @@ Chromium receives fulfilled document/style/image/font requests; a loopback deny 
 
 The integration suite injects an internal fixture fetcher that maps `https://example.com/` to its own local test website. There is no production environment variable or API field that enables this mapping or permits private targets.
 
-Read [Phase 2 implementation and limits](phase-2.md). This is a constrained interactive prototype, not a full host network sandbox. Input is limited to native HTML controls and GET navigation. Active scripts, POST requests, additional transports and remote access need further threat review and tests. The program runs under your Windows account; a browser exploit is outside these application-level guarantees. Normal operation uses Chromium's own sandbox and never disables TLS verification.
+Read [Phase 2 implementation and limits](phase-2.md). This is a constrained interactive prototype, not a full host network sandbox. Input is limited to native HTML controls and GET navigation. Public mode now supports scripts, POST and WebSockets under the guard described above; remote access still requires separate authorization. The program runs under your Windows account; a browser exploit is outside these application-level guarantees. Normal operation uses Chromium's own sandbox and never disables TLS verification.
 
 ## Required before any remote access
 

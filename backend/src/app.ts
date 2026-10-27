@@ -35,6 +35,7 @@ export async function buildApp(config: Config, options: { engine?: BrowserEngine
     options.engine ??
     new PlaywrightEngine({
       domains: config.ALLOWED_DOMAINS,
+      mode: config.BROWSING_MODE,
       homeUrl: config.HOME_URL,
       channel: config.BROWSER_CHANNEL,
     });
@@ -156,6 +157,8 @@ export async function buildApp(config: Config, options: { engine?: BrowserEngine
         engine: 'playwright',
         session: engine.status(),
         capabilities: { browser: true, display: true, input: true },
+        browsingMode: config.BROWSING_MODE,
+        searchProvider: config.SEARCH_PROVIDER,
         allowedDomains: config.ALLOWED_DOMAINS,
         homeUrl: config.HOME_URL,
         authExpiresAt: auth.authenticate(request.headers.authorization),
@@ -175,7 +178,7 @@ export async function buildApp(config: Config, options: { engine?: BrowserEngine
       api.post('/sessions/:id/navigate', async (request) => {
         const { id } = sessionParamsSchema.parse(request.params);
         const { url } = navigateSchema.parse(request.body);
-        validateNavigationUrl(url, config.ALLOWED_DOMAINS);
+        validateNavigationUrl(url, config.ALLOWED_DOMAINS, config.BROWSING_MODE);
         const session = await engine.navigate(id, url);
         auth.authenticate(request.headers.authorization);
         return session;

@@ -22,10 +22,12 @@ const schema = z.object({
   ALLOWED_ORIGINS: list
     .pipe(z.array(z.string().refine(validOrigin)).min(1))
     .default(['http://127.0.0.1:5173', 'http://localhost:5173']),
+  BROWSING_MODE: z.enum(['public', 'allowlist']).default('public'),
+  SEARCH_PROVIDER: z.enum(['google', 'duckduckgo']).default('google'),
   ALLOWED_DOMAINS: list
     .pipe(z.array(z.string().refine(isAllowedDomainEntry)).min(1))
     .default(['example.com', 'www.example.com']),
-  HOME_URL: z.string().default('https://example.com/'),
+  HOME_URL: z.string().default('https://www.google.com/'),
   AUTH_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(1800),
   LOG_LEVEL: z.enum(['silent', 'error', 'warn', 'info', 'debug']).default('info'),
   BROWSER_CHANNEL: z.enum(['chromium', 'chrome', 'msedge']).default('chromium'),
@@ -54,7 +56,11 @@ export function parseConfig(env: NodeJS.ProcessEnv) {
       `Invalid configuration: ${[...new Set(result.error.issues.map((issue) => issue.path[0]))].join(', ')}. See backend/.env.example.`,
     );
   }
-  validateNavigationUrl(result.data.HOME_URL, result.data.ALLOWED_DOMAINS);
+  validateNavigationUrl(
+    result.data.HOME_URL,
+    result.data.ALLOWED_DOMAINS,
+    result.data.BROWSING_MODE,
+  );
   return { ...result.data, HOST: '127.0.0.1' as const };
 }
 export type Config = ReturnType<typeof parseConfig>;

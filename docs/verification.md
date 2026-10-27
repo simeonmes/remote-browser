@@ -1,6 +1,19 @@
 # Verification
 
-## Final local verification — October 27, 2026
+## Public-browsing extension ? October 27, 2026
+
+- `npm run check`: passed types, 168 regular tests and production builds.
+- `npm run test:browser`: passed 13 tests, including native scripts, POST, cookies, WebSockets, history, popup replacement and private-target rejection.
+- Root and `/remote-browser/` UI smoke: both public and allowlist modes passed. Search conversion was checked at the API boundary without sending fixture queries to a search provider.
+- `npm run build:pages`: asset path, CSP and secret-exclusion checks passed.
+- Public-mode ten-cycle cleanup profile: 1.72 MiB retained heap, below the 16 MiB short-test budget. This is not a long-term leak proof.
+- Live public checks: Example Domain and Wikipedia rendered; Google search returned verification, DuckDuckGo search returned a site error. Normal search results remain unverified on this connection.
+
+The public UI smoke initially clicked before responsive resize had settled. Waiting for the resized viewport fixed the test; both base paths subsequently passed. The earlier browser WebSocket test exposed Chromium using CONNECT for port 80; the guard now accepts validated public port 80 connections as well as 443. No private-destination exception was added.
+
+The original phase results below are historical; public-mode functionality and limits are documented in [public browsing](public-browsing.md).
+
+## Original phase verification — October 27, 2026
 
 Environment: Windows, Node.js 24.18.0, npm 11.16.0, Playwright-managed Chromium 156.0.8078.4. Chromium's sandbox remained enabled. Browser tests used normal Windows process permissions because the restricted automation runner crashes sandboxed renderers; no Windows security settings were changed.
 
@@ -25,7 +38,7 @@ Earlier test failures were fixed: native pointer drag detection with scripts dis
 
 ## What has not been claimed
 
-Actual GitHub-hosted Actions, Pages delivery, remote-device access, third-party JavaScript applications, long-running memory stability and independent security auditing have not been verified. Public deployment and remote network configuration were not performed. The backend remains on loopback.
+Actual GitHub-hosted Actions, Pages delivery, remote-device access, comprehensive third-party website compatibility, long-running memory stability and independent security auditing have not been verified. Public deployment and remote network configuration were not performed. The backend remains on loopback.
 
 Historical implementation details are in [Phase 2](phase-2.md), [Phase 3](phase-3.md), [Phase 4](phase-4.md), [Phase 5](phase-5.md), and [Phase 6](phase-6.md).
 

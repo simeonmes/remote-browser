@@ -30,5 +30,7 @@ jobs:
       - run: npm run browser:install
       - run: npm run test:browser
       - run: npm run smoke
+      - run: npm run smoke:public
       - run: npm run smoke:pages
       - run: npm run profile
+      - run: npm run profile:public

@@ -1,29 +1,46 @@
 import { isIP } from 'node:net';
 import { AppError } from './errors.js';
 
-/** Syntax layer; SafeFetcher checks DNS and pins the destination before network access. */
-export function validateNavigationUrl(value: string, allowedDomains: readonly string[]): URL {
+/** Syntax layer; the fetcher or egress proxy checks DNS and pins connections. */
+export type BrowsingMode = 'allowlist' | 'public';
+export function validateNavigationUrl(
+  value: string,
+  allowedDomains: readonly string[],
+  mode: BrowsingMode = 'allowlist',
+): URL {
   let url: URL;
   try {
     url = new URL(value);
   } catch {
-    throw blocked('Enter a complete HTTPS URL.');
+    throw blocked(
+      mode === 'public' ? 'Enter a complete HTTP or HTTPS URL.' : 'Enter a complete HTTPS URL.',
+    );
   }
   if (
     value.length > 2048 ||
-    url.protocol !== 'https:' ||
+    !(url.protocol === 'https:' || (mode === 'public' && url.protocol === 'http:')) ||
     url.username ||
     url.password ||
     url.port
   ) {
-    throw blocked('Only HTTPS URLs on port 443 without embedded credentials are permitted.');
+    throw blocked(
+      mode === 'public'
+        ? 'Use HTTP on port 80 or HTTPS on port 443, without embedded credentials.'
+        : 'Only HTTPS URLs on port 443 without embedded credentials are permitted.',
+    );
   }
   if (
     isIP(url.hostname) ||
     url.hostname.startsWith('[') ||
-    !allowedDomains.includes(url.hostname)
+    (mode === 'allowlist'
+      ? !allowedDomains.includes(url.hostname)
+      : !isAllowedDomainEntry(url.hostname))
   ) {
-    throw blocked('This domain is not on the configured test allowlist.');
+    throw blocked(
+      mode === 'allowlist'
+        ? 'This domain is not on the configured test allowlist.'
+        : 'Use a public website hostname. Local addresses and internal sites are blocked.',
+    );
   }
   return url;
 }

@@ -18,7 +18,12 @@ const base = html.match(/src="([^"]*)assets\//)?.[1] || '/';
 if (channel && !['chrome', 'msedge'].includes(channel))
   throw new Error('SMOKE_BROWSER_CHANNEL must be chrome or msedge.');
 const secret = randomBytes(32).toString('hex');
-const config = parseConfig({ AUTH_SECRET: secret, LOG_LEVEL: 'silent' });
+const config = parseConfig({
+  AUTH_SECRET: secret,
+  LOG_LEVEL: 'silent',
+  BROWSING_MODE: 'allowlist',
+  HOME_URL: 'https://example.com/',
+});
 let app;
 let frontend;
 let browser;

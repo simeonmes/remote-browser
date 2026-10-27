@@ -6,16 +6,16 @@
 | -------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | 3 — Interactivity          | Complete         | Authenticated live JPEG stream, pointer/text/keyboard/scroll, navigation history, responsive viewport, loading/errors                 |
 | 4 — Security/reliability   | Complete         | Existing auth/SSRF protections preserved; expiry, bounded input, one controller, heartbeats, reconnect without replay, crash recovery |
-| 5 — Tests/performance      | Complete         | 149 regular tests, nine real Chromium tests, real UI smoke, adaptive capture, backpressure, cleanup and memory profiling              |
+| 5 — Tests/performance      | Complete         | 168 regular tests, 13 real Chromium tests, real UI smoke, adaptive capture, backpressure, cleanup and memory profiling                |
 | 6 — Deployment preparation | Complete locally | Forced `/remote-browser/` build, artifact verification, CSP, manual Pages workflow and publishing docs                                |
 
-Git commits record each successful phase. Phase 3: `e0c872d`; Phase 4: `92ccdd6`; Phase 5: `05b38e6`. The Phase 6 commit contains this report; use `git log --oneline -4` for its identifier. No remote or public push was created.
+Git commits record each successful phase. Phase 3: `e0c872d`; Phase 4: `92ccdd6`; Phase 5: `05b38e6`. Phase 6: `e77d2c9`. The later public-browsing extension is recorded separately. No remote or public push was created.
 
 ## Validation and remaining limits
 
-All 149 regular tests and nine browser tests pass. Root and Pages-path UI smoke tests, typechecks, builds, formatting, production dependency audit and memory profile pass. Zero known production dependency vulnerabilities were reported. Failed tests encountered during development were fixed. See [verification](verification.md) for commands, scope and measurements.
+All 168 regular tests and 13 browser tests pass. Public-mode UI smoke also passes at both root and Pages paths; ten public sessions retained 1.72 MiB after warming and explicit GC. Root and Pages-path UI smoke tests, typechecks, builds, formatting, production dependency audit and memory profile pass. Zero known production dependency vulnerabilities were reported. Failed tests encountered during development were fixed. See [verification](verification.md) for commands, scope and measurements.
 
-No known remaining failing tests or release-blocking bugs were found within the supported scope. This remains a constrained prototype: JavaScript pages, POST requests, upstream authenticated cookies, downloads, popups, media streaming, OS clipboard readback and full semantic accessibility are unsupported. History reloads URLs rather than restoring page state. Native input and GET forms are supported. Browser crashes recover through Stop/Start.
+The later all-purpose-browsing request is implemented as public-web mode: JavaScript, forms, cookies, WebSockets, native history, search and bare-domain navigation. The original restricted mode remains selectable. There are no known failing automated tests. This remains a single-viewport prototype without audio, file transfer, persistent profiles, full tabs, OS clipboard readback or semantic page accessibility. Browser crashes recover through Stop/Start. Google returned a verification page and DuckDuckGo returned an error in live checks; normal provider search results are not claimed. See [public browsing](public-browsing.md).
 
 No public networking or deployment actions were taken. Publishing source/Pages and configuring any permitted remote backend access require your approval. There are no pending approvals needed to run locally. Hosted CI, actual Pages delivery, remote devices, long-term memory behavior and independent security review remain unverified.
 

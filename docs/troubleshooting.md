@@ -23,7 +23,9 @@ Do not disable TLS verification, browser security, or firewall rules as a workar
 
 If Chromium cannot start, run `npm run browser:install` from the repository root. If a sandboxed renderer crashes only in a restricted runner, use your normal VS Code terminal; keep Chromium's own sandbox enabled.
 
-A failed navigation may mean a DNS answer was private/reserved, a redirect was blocked, a resource budget was reached, or the remote page was unavailable. The browser panel shows a sanitized error; navigate to a permitted page or stop/start the browser to reset its budget. Scripts, compressed upstream responses, redirecting subresources and non-GET browsing are intentionally unsupported.
+A failed navigation may mean a DNS answer was private/reserved, a redirect was blocked, a resource budget was reached, or the remote page was unavailable. The browser panel shows a sanitized error; navigate to a permitted page or stop/start the browser to reset its budget. In public mode, scripts, compressed responses, redirects, forms and cookies are supported. If you still see ?Allowlist only,? set `BROWSING_MODE=public`, restart the backend and reconnect. The original allowlist mode intentionally disables scripts and POST.
+
+Search providers may return verification pages or errors. Google showed an unusual-traffic verification page and DuckDuckGo returned an error during live verification on this connection. The address-bar query was sent correctly; this does not prove normal search results work on every network. Complete legitimate website prompts when available, or enter a public website directly. This app does not bypass provider or administrator restrictions.
 
 If the display disconnects, wait for automatic reconnect. Pending clicks are not replayed. Another controller or an expired token requires reconnecting or restarting the browser. A crashed Chromium session requires Stop browser then Start browser.
 

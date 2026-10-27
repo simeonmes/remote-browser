@@ -11,8 +11,10 @@ import { AppError } from '../errors.js';
 import { validateNavigationUrl } from '../url-policy.js';
 import { SafeFetcher, type Resource, type ResourceFetcher } from './safe-fetch.js';
 import { startDenyProxy } from './deny-proxy.js';
+import { startEgressProxy } from './egress-proxy.js';
 
 export type EngineOptions = {
+  mode?: 'public' | 'allowlist';
   domains: string[];
   homeUrl: string;
   channel: 'chromium' | 'chrome' | 'msedge';
@@ -36,7 +38,7 @@ export interface BrowserEngine {
   releaseInput(): Promise<void>;
 }
 
-/** One ephemeral Chromium session with GET-only resources fulfilled by Node. */
+/** One ephemeral Chromium session using either guarded public networking or a restricted fetcher. */
 export class PlaywrightEngine implements BrowserEngine {
   private browser: Browser | undefined;
   private page: Page | undefined;
@@ -59,10 +61,12 @@ export class PlaywrightEngine implements BrowserEngine {
   private historyIndex = -1;
   private pendingNavigation: string | undefined;
   private pressedButtons = new Set<'left' | 'middle' | 'right'>();
+  private adoptingPopup = false;
 
   constructor(
     private readonly options: EngineOptions,
     fetcher?: ResourceFetcher,
+    private readonly proxyFactory = startEgressProxy,
   ) {
     this.fetcher = fetcher ?? new SafeFetcher(options.domains);
   }
@@ -88,6 +92,7 @@ export class PlaywrightEngine implements BrowserEngine {
     this.resourceCount = 0;
     this.inFlightResources = 0;
     this.resourceBytes = 0;
+    this.adoptingPopup = false;
     this.historyUrls = [];
     this.historyIndex = -1;
     this.session = {
@@ -106,7 +111,7 @@ export class PlaywrightEngine implements BrowserEngine {
         new URL('../../../.playwright', import.meta.url),
       );
       const { chromium } = await import('playwright');
-      const guard = await startDenyProxy();
+      const guard = await (this.options.mode === 'public' ? this.proxyFactory() : startDenyProxy());
       if (generation !== this.generation) {
         await guard.close();
         throw new Error('Cancelled');
@@ -132,7 +137,7 @@ export class PlaywrightEngine implements BrowserEngine {
       const context = await browser.newContext({
         viewport,
         deviceScaleFactor: 1,
-        javaScriptEnabled: false,
+        javaScriptEnabled: this.options.mode === 'public',
         serviceWorkers: 'block',
         acceptDownloads: false,
         permissions: [],
@@ -142,78 +147,89 @@ export class PlaywrightEngine implements BrowserEngine {
         throw new Error('Cancelled');
       }
       context.setDefaultTimeout(5000);
-      await context.routeWebSocket('**/*', (route) => route.close());
+      if (this.options.mode !== 'public')
+        await context.routeWebSocket('**/*', (route) => route.close());
       const controller = this.controller;
-      await context.route('**/*', async (route) => {
-        const request = route.request();
-        let counted = false;
-        try {
-          validateNavigationUrl(request.url(), this.options.domains);
-          if (
-            request.method() !== 'GET' ||
-            !['document', 'stylesheet', 'image', 'font'].includes(request.resourceType())
-          )
-            throw new Error('Only read-only document resources are supported.');
-          if (
-            generation !== this.generation ||
-            this.inFlightResources >= 16 ||
-            ++this.resourceCount > 500 ||
-            this.resourceBytes > 25 * 1024 * 1024
-          )
-            throw new Error('The browser resource limit was reached.');
-          this.inFlightResources++;
-          counted = true;
-          const prepared =
-            this.documentResource?.url === request.url() &&
-            request.isNavigationRequest() &&
-            request.frame() === this.page?.mainFrame()
-              ? this.documentResource
-              : undefined;
-          if (prepared) this.documentResource = undefined;
-          if (
-            !prepared &&
-            request.isNavigationRequest() &&
-            request.frame() === this.page?.mainFrame()
-          ) {
-            // Native links and GET forms re-enter our explicit redirect-validation path.
-            this.pendingNavigation = request.url();
-            await route.abort('aborted');
-            if (!this.operation) void this.drainNavigation();
-            return;
+      if (this.options.mode === 'public') {
+        await context.route('**/*', async (route) => {
+          try {
+            validateNavigationUrl(route.request().url(), [], 'public');
+            await route.continue();
+          } catch {
+            await route.abort('blockedbyclient').catch(() => {});
           }
-          const resource =
-            prepared?.resource ?? (await this.fetcher.fetch(request.url(), controller.signal));
-          if (generation !== this.generation) throw new Error('Session stopped.');
-          if (!prepared) this.resourceBytes += resource.body.length;
-          if (generation !== this.generation || this.resourceBytes > 25 * 1024 * 1024)
-            throw new Error('Session stopped or resource budget exceeded.');
-          if (resource.headers.location)
-            validateNavigationUrl(
-              new URL(resource.headers.location, request.url()).href,
-              this.options.domains,
-            );
-          // Playwright does not re-route every redirect hop. Never pass a redirect through
-          // to Chromium; document redirects are resolved before goto, below.
-          if (resource.status >= 300 && resource.status < 400)
-            throw new Error('Redirecting subresources are not supported in this phase.');
-          await route.fulfill(resource);
-        } catch (error) {
-          if (
-            generation === this.generation &&
-            request.isNavigationRequest() &&
-            request.frame() === this.page?.mainFrame()
-          ) {
-            this.blockedNavigation =
-              error instanceof AppError
-                ? error.message
-                : 'The page could not be loaded under the test browsing policy.';
-            if (this.session) this.session.error = this.blockedNavigation;
+        });
+      } else
+        await context.route('**/*', async (route) => {
+          const request = route.request();
+          let counted = false;
+          try {
+            validateNavigationUrl(request.url(), this.options.domains);
+            if (
+              request.method() !== 'GET' ||
+              !['document', 'stylesheet', 'image', 'font'].includes(request.resourceType())
+            )
+              throw new Error('Only read-only document resources are supported.');
+            if (
+              generation !== this.generation ||
+              this.inFlightResources >= 16 ||
+              ++this.resourceCount > 500 ||
+              this.resourceBytes > 25 * 1024 * 1024
+            )
+              throw new Error('The browser resource limit was reached.');
+            this.inFlightResources++;
+            counted = true;
+            const prepared =
+              this.documentResource?.url === request.url() &&
+              request.isNavigationRequest() &&
+              request.frame() === this.page?.mainFrame()
+                ? this.documentResource
+                : undefined;
+            if (prepared) this.documentResource = undefined;
+            if (
+              !prepared &&
+              request.isNavigationRequest() &&
+              request.frame() === this.page?.mainFrame()
+            ) {
+              // Native links and GET forms re-enter our explicit redirect-validation path.
+              this.pendingNavigation = request.url();
+              await route.abort('aborted');
+              if (!this.operation) void this.drainNavigation();
+              return;
+            }
+            const resource =
+              prepared?.resource ?? (await this.fetcher.fetch(request.url(), controller.signal));
+            if (generation !== this.generation) throw new Error('Session stopped.');
+            if (!prepared) this.resourceBytes += resource.body.length;
+            if (generation !== this.generation || this.resourceBytes > 25 * 1024 * 1024)
+              throw new Error('Session stopped or resource budget exceeded.');
+            if (resource.headers.location)
+              validateNavigationUrl(
+                new URL(resource.headers.location, request.url()).href,
+                this.options.domains,
+              );
+            // Playwright does not re-route every redirect hop. Never pass a redirect through
+            // to Chromium; document redirects are resolved before goto, below.
+            if (resource.status >= 300 && resource.status < 400)
+              throw new Error('Redirecting subresources are not supported in this phase.');
+            await route.fulfill(resource);
+          } catch (error) {
+            if (
+              generation === this.generation &&
+              request.isNavigationRequest() &&
+              request.frame() === this.page?.mainFrame()
+            ) {
+              this.blockedNavigation =
+                error instanceof AppError
+                  ? error.message
+                  : 'The page could not be loaded under the test browsing policy.';
+              if (this.session) this.session.error = this.blockedNavigation;
+            }
+            await route.abort('blockedbyclient').catch(() => {});
+          } finally {
+            if (counted && generation === this.generation) this.inFlightResources--;
           }
-          await route.abort('blockedbyclient').catch(() => {});
-        } finally {
-          if (counted && generation === this.generation) this.inFlightResources--;
-        }
-      });
+        });
       const page = await context.newPage();
       if (generation !== this.generation) {
         await page.close();
@@ -221,8 +237,15 @@ export class PlaywrightEngine implements BrowserEngine {
       }
       this.page = page;
       this.inputChannel = await context.newCDPSession(page);
+      if (this.options.mode === 'public') this.watchPublicPage(page, generation);
       context.on('page', (popup) => {
-        if (popup !== page) void popup.close().catch(() => {});
+        if (popup === this.page) return;
+        if (this.options.mode === 'public' && !this.adoptingPopup) {
+          this.adoptingPopup = true;
+          void this.adoptPopup(popup, generation).finally(() => {
+            if (generation === this.generation) this.adoptingPopup = false;
+          });
+        } else void popup.close().catch(() => {});
       });
       page.on('crash', () => {
         if (this.page === page)
@@ -253,7 +276,7 @@ export class PlaywrightEngine implements BrowserEngine {
 
   async navigate(id: string, value: string): Promise<BrowserSession> {
     this.requireSession(id);
-    validateNavigationUrl(value, this.options.domains);
+    validateNavigationUrl(value, this.options.domains, this.options.mode);
     if (this.operation)
       throw new AppError(409, 'BROWSER_BUSY', 'Wait for the current browser operation to finish.');
     this.operation = true;
@@ -270,6 +293,7 @@ export class PlaywrightEngine implements BrowserEngine {
     generation: number,
     history: 'push' | 'replace' | number = 'push',
   ): Promise<BrowserSession> {
+    if (this.options.mode === 'public') return this.loadPublic(value, generation);
     const page = this.page;
     if (!page || !this.session)
       throw new AppError(409, 'BROWSER_UNAVAILABLE', 'Start a browser session first.');
@@ -393,6 +417,175 @@ export class PlaywrightEngine implements BrowserEngine {
     return this.session;
   }
 
+  private watchPublicPage(page: Page, generation: number) {
+    page.on('framenavigated', (frame) => {
+      if (
+        frame !== page.mainFrame() ||
+        this.page !== page ||
+        generation !== this.generation ||
+        !this.session
+      )
+        return;
+      this.session.revision++;
+      this.cached = undefined;
+      this.session.url = page.url();
+      this.session.state = 'loading';
+      void this.updatePublicPage(page, generation).catch(() => {});
+    });
+    page.on('domcontentloaded', () => {
+      void this.updatePublicPage(page, generation).catch(() => {});
+    });
+    page.on('load', () => {
+      void this.updatePublicPage(page, generation).catch(() => {});
+    });
+    page.on('requestfailed', (request) => {
+      if (
+        request.isNavigationRequest() &&
+        request.frame() === page.mainFrame() &&
+        this.page === page &&
+        generation === this.generation &&
+        this.session &&
+        !this.operation
+      ) {
+        this.session.error =
+          'The website could not load. Its address may be private, blocked, or unavailable.';
+        this.session.state = 'failed';
+      }
+    });
+  }
+
+  private async updatePublicPage(page: Page, generation: number) {
+    if (this.page !== page || generation !== this.generation || !this.session) return;
+    const url = page.url();
+    try {
+      validateNavigationUrl(url, [], 'public');
+    } catch {
+      if (url !== 'about:blank' && this.session) {
+        this.session.state = 'failed';
+        this.session.error = 'The website could not load. Try another address.';
+      }
+      return;
+    }
+    const title = (await page.title()).slice(0, 200);
+    const history = (await this.inputChannel!.send('Page.getNavigationHistory')) as {
+      currentIndex: number;
+      entries: { url: string }[];
+    };
+    if (this.page !== page || generation !== this.generation || !this.session || page.url() !== url)
+      return;
+    this.session.url = url;
+    this.session.title = title;
+    this.session.state = 'ready';
+    this.session.error = null;
+    this.session.canGoBack =
+      history.currentIndex > 0 &&
+      /^https?:/.test(history.entries[history.currentIndex - 1]?.url ?? '');
+    this.session.canGoForward = history.currentIndex < history.entries.length - 1;
+  }
+
+  private async adoptPopup(popup: Page, generation: number) {
+    try {
+      await popup.waitForURL(/^https?:/, { waitUntil: 'domcontentloaded', timeout: 10_000 });
+      validateNavigationUrl(popup.url(), [], 'public');
+      if (generation !== this.generation || !this.session) {
+        await popup.close();
+        return;
+      }
+      const previous = this.page;
+      await this.releaseInput();
+      const channel = await popup.context().newCDPSession(popup);
+      if (generation !== this.generation || !this.session) {
+        await popup.close();
+        return;
+      }
+      this.page = popup;
+      this.inputChannel = channel;
+      this.session.revision++;
+      this.cached = undefined;
+      this.watchPublicPage(popup, generation);
+      popup.on('crash', () => {
+        if (this.page === popup)
+          void this.fail('Chromium crashed. Stop this session and start again.');
+      });
+      popup.on('dialog', (dialog) => {
+        void dialog.dismiss().catch(() => {});
+      });
+      popup.on('download', (download) => {
+        void download.cancel().catch(() => {});
+      });
+      await previous?.close().catch(() => {});
+      await this.updatePublicPage(popup, generation);
+    } catch {
+      await popup.close().catch(() => {});
+    }
+  }
+
+  private async loadPublic(value: string, generation: number): Promise<BrowserSession> {
+    const page = this.page;
+    if (!page || !this.session)
+      throw new AppError(409, 'BROWSER_UNAVAILABLE', 'Start a browser session first.');
+    this.session.state = 'loading';
+    this.session.error = null;
+    this.session.revision++;
+    this.cached = undefined;
+    try {
+      await page.goto(validateNavigationUrl(value, [], 'public').href, {
+        waitUntil: 'domcontentloaded',
+        timeout: 25_000,
+      });
+      await this.updatePublicPage(page, generation);
+      if (generation !== this.generation || !this.session) throw new Error('Session ended.');
+      return this.status()!;
+    } catch {
+      const message =
+        'The website could not load. Check its address and connection. Private-network destinations are blocked.';
+      if (generation === this.generation && this.session) {
+        this.session.state = 'failed';
+        this.session.error = message;
+      }
+      throw new AppError(502, 'NAVIGATION_FAILED', message);
+    }
+  }
+
+  private async historyPublic(id: string, action: NavigationAction): Promise<BrowserSession> {
+    const page = this.page;
+    if (!page) throw new AppError(409, 'BROWSER_UNAVAILABLE', 'Restart the browser session.');
+    if (
+      (action === 'back' && !this.session?.canGoBack) ||
+      (action === 'forward' && !this.session?.canGoForward)
+    )
+      return this.requireSession(id);
+    this.operation = true;
+    try {
+      if (action === 'home') return await this.loadPublic(this.options.homeUrl, this.generation);
+      if (this.session) {
+        this.session.state = 'loading';
+        this.session.error = null;
+        this.session.revision++;
+        this.cached = undefined;
+      }
+      const options = { waitUntil: 'domcontentloaded' as const, timeout: 25_000 };
+      if (action === 'back') await page.goBack(options);
+      else if (action === 'forward') await page.goForward(options);
+      else await page.reload(options);
+      await this.updatePublicPage(page, this.generation);
+      return this.requireSession(id);
+    } catch {
+      if (this.session?.id === id) {
+        this.session.state = 'failed';
+        this.session.error =
+          'Navigation did not finish. Try another address or restart the browser.';
+      }
+      throw new AppError(
+        502,
+        'NAVIGATION_FAILED',
+        'Navigation did not finish. Try another address or restart the browser.',
+      );
+    } finally {
+      this.operation = false;
+    }
+  }
+
   private async drainNavigation() {
     if (this.operation || !this.pendingNavigation || !this.session) return;
     const url = this.pendingNavigation;
@@ -403,6 +596,7 @@ export class PlaywrightEngine implements BrowserEngine {
   async history(id: string, action: NavigationAction): Promise<BrowserSession> {
     const session = this.requireSession(id);
     if (this.operation) throw new AppError(409, 'BROWSER_BUSY', 'Wait for navigation to finish.');
+    if (this.options.mode === 'public') return this.historyPublic(id, action);
     const index = action === 'back' ? this.historyIndex - 1 : this.historyIndex + 1;
     if ((action === 'back' || action === 'forward') && !this.historyUrls[index]) return session;
     this.operation = true;

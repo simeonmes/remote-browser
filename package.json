@@ -27,8 +27,10 @@
     "check": "npm run typecheck && npm test && npm run build",
     "start": "npm run start -w backend",
     "smoke": "npm run build && node scripts/smoke.mjs",
+    "smoke:public": "npm run build && node scripts/smoke-public.mjs",
     "browser:install": "node scripts/install-browser.mjs",
     "profile": "npm run build -w shared && npm run build -w backend && node --expose-gc scripts/profile.mjs",
+    "profile:public": "npm run build -w shared && npm run build -w backend && node --expose-gc scripts/profile.mjs --public",
     "build:pages": "npm run build -w shared && npm run typecheck -w frontend && node scripts/build-pages.mjs && node scripts/verify-pages.mjs",
     "smoke:pages": "npm run build -w shared && npm run build -w backend && npm run build:pages && node scripts/smoke.mjs",
     "preview:frontend": "npm run preview -w frontend"

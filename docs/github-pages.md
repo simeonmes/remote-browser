@@ -1,6 +1,6 @@
 # GitHub Pages preparation and publishing
 
-The static React frontend is ready to build at **/remote-browser/**. GitHub Pages cannot run the Node/Playwright backend, Chromium or the WebSocket server. The checked-in backend is intentionally loopback-only. Publishing the frontend alone does not enable access from other devices or grant network permission.
+The static React frontend is ready to build at **/remote-browser/**. With your GitHub username and a repository named `remote-browser`, the intended published URL is **https://simeonmes.github.io/remote-browser/**. It has not been published. GitHub Pages cannot run the Node/Playwright backend, Chromium or the WebSocket server. The checked-in backend is intentionally loopback-only. Publishing the frontend alone does not enable access from other devices or grant network permission.
 
 ## Verify locally without publishing
 
@@ -33,7 +33,7 @@ Local Git commits already record each completed phase; there is no configured re
 ```powershell
 git status
 git log --oneline
-git remote add origin https://github.com/YOUR_USERNAME/remote-browser.git
+git remote add origin https://github.com/simeonmes/remote-browser.git
 git push -u origin main
 ```
 
@@ -57,4 +57,4 @@ Keep the backend on the HP Victus. Start it with `npm run build` then `npm start
 
 A future remote deployment needs explicit permission, permitted routing, trusted HTTPS/WSS, restricted inbound access, and reviewed Host/Origin validation. The current server rejects nonlocal Host headers and does not bind remote interfaces. Those settings have deliberately not been loosened. Do not simply replace the URL and assume remote access works.
 
-An HTTPS frontend may be blocked from an HTTP/private-network backend by browser protections or network policy. Do not disable those protections, TLS validation, firewall rules or administrator restrictions. An allowlisted frontend Origin is an authentication defense, not network authorization. The correct Pages Origin is `https://YOUR_USERNAME.github.io`, without the repository path, when a separately approved backend deployment is ready.
+An HTTPS frontend may be blocked from an HTTP/private-network backend by browser protections or network policy. Do not disable those protections, TLS validation, firewall rules or administrator restrictions. An allowlisted frontend Origin is an authentication defense, not network authorization. The correct Pages Origin is `https://simeonmes.github.io`, without the repository path, when a separately approved backend deployment is ready.

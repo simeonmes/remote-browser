@@ -6,7 +6,7 @@ const root = new URL('../', import.meta.url);
 try {
   await writeFile(
     new URL('backend/.env', root),
-    `AUTH_SECRET=${randomBytes(32).toString('hex')}\nPORT=4318\nALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173\nALLOWED_DOMAINS=example.com,www.example.com\nHOME_URL=https://example.com/\nAUTH_TTL_SECONDS=1800\nLOG_LEVEL=info\n`,
+    `AUTH_SECRET=${randomBytes(32).toString('hex')}\nPORT=4318\nALLOWED_ORIGINS=http://127.0.0.1:5173,http://localhost:5173\nBROWSING_MODE=public\nSEARCH_PROVIDER=google\nALLOWED_DOMAINS=example.com,www.example.com\nHOME_URL=https://www.google.com/\nAUTH_TTL_SECONDS=1800\nLOG_LEVEL=info\n`,
     { flag: 'wx', mode: 0o600 },
   );
   console.log(
