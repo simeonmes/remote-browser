@@ -1,0 +1,25 @@
+{
+  "name": "@remote-browser/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build -w @remote-browser/shared && npm run build && concurrently --kill-others -n types,node \"tsc -p tsconfig.json --watch --preserveWatchOutput\" \"node --watch dist/server.js\"",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "11.3.1",
+    "@fastify/helmet": "13.2.0",
+    "@fastify/rate-limit": "11.2.1",
+    "@fastify/websocket": "11.3.4",
+    "@remote-browser/shared": "0.1.0",
+    "dotenv": "18.0.9",
+    "fastify": "5.12.7",
+    "ipaddr.js": "2.5.0",
+    "playwright": "1.64.1",
+    "ws": "8.22.0",
+    "zod": "4.6.7"
+  }
+}

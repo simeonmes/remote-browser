@@ -1,0 +1,9 @@
+node_modules
+**/dist
+.npm-cache
+.playwright
+test-results
+playwright-report
+coverage
+**/.env*
+package-lock.json

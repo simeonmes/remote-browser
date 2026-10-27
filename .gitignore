@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+.npm-cache/
+.playwright/
+test-results/
+playwright-report/
+*.log
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
