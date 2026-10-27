@@ -1,6 +1,6 @@
 # GitHub Pages preparation and publishing
 
-The static React frontend is ready to build at **/remote-browser/**. With your GitHub username and a repository named `remote-browser`, the intended published URL is **https://simeonmes.github.io/remote-browser/**. It has not been published. GitHub Pages cannot run the Node/Playwright backend, Chromium or the WebSocket server. The checked-in backend is intentionally loopback-only. Publishing the frontend alone does not enable access from other devices or grant network permission.
+The static React frontend is ready to build at **/remote-browser/**. With your GitHub username and a repository named `remote-browser`, the intended published URL is **https://simeonmes.github.io/remote-browser/**. It was published and verified on October 27, 2026. Use [the remote launcher](remote-access.md) to keep its backend address current. GitHub Pages cannot run the Node/Playwright backend, Chromium or the WebSocket server. The checked-in backend is intentionally loopback-only. Publishing the frontend alone does not enable access from other devices or grant network permission.
 
 ## Verify locally without publishing
 
@@ -28,12 +28,11 @@ Open `http://127.0.0.1:5173/remote-browser/`. Local preview uses the existing al
 
 ## Publish source when approved
 
-Local Git commits already record each completed phase; there is no configured remote. Create a GitHub repository named `remote-browser` only when you are ready, then review:
+Local commits record each phase, and origin is configured as `https://github.com/simeonmes/remote-browser.git`. Review and push future changes with:
 
 ```powershell
 git status
 git log --oneline
-git remote add origin https://github.com/simeonmes/remote-browser.git
 git push -u origin main
 ```
 
@@ -47,7 +46,7 @@ Do not upload `.env`, browser profiles, caches, screenshots or credentials. The 
 4. Run **Deploy static frontend** with **publish unchecked** for an artifact-only run.
 5. Only when you approve public publication, run it with **publish checked**. The deploy job uses the `github-pages` environment; configure a required reviewer there if desired and available for your repository.
 
-No workflow was run and no public deployment was performed during implementation. Hosted CI and actual Pages delivery remain externally unverified. The regular checks workflow runs on Windows and Ubuntu; its browser job tests Windows Chromium and both root/repository-path previews.
+Hosted checks and the first Pages deployment succeeded on October 27, 2026. The published frontend passed real login, live viewport, navigation and logout checks through the HTTPS tunnel. The regular checks workflow runs on Windows and Ubuntu; its browser job tests Windows Chromium and both root/repository-path previews.
 
 The repository path follows [Vite's project-page guidance](https://vite.dev/guide/static-deploy). The workflow uses GitHub's configure/upload/deploy actions and limited job permissions as described in [GitHub's custom workflow documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages). If you rename the repository or use a root/custom domain, change the dedicated Pages build path and verification script together.
 
@@ -55,6 +54,6 @@ The repository path follows [Vite's project-page guidance](https://vite.dev/guid
 
 Keep the backend on the HP Victus. Start it with `npm run build` then `npm start`; keep the laptop awake while using it. Its authentication key belongs only in `backend/.env`, never GitHub Pages build variables. Restarting the backend ends all sessions.
 
-A future remote deployment needs explicit permission, permitted routing, trusted HTTPS/WSS, restricted inbound access, and reviewed Host/Origin validation. The current server rejects nonlocal Host headers and does not bind remote interfaces. Those settings have deliberately not been loosened. Do not simply replace the URL and assume remote access works.
+The optional remote launcher provides HTTPS/WSS through Cloudflare and adds the exact Pages origin for its backend process. The server still binds loopback and accepts only its local upstream Host; the connector sets that Host explicitly. Run it only where this access is permitted. See [remote access](remote-access.md).
 
 An HTTPS frontend may be blocked from an HTTP/private-network backend by browser protections or network policy. Do not disable those protections, TLS validation, firewall rules or administrator restrictions. An allowlisted frontend Origin is an authentication defense, not network authorization. The correct Pages Origin is `https://simeonmes.github.io`, without the repository path, when a separately approved backend deployment is ready.

@@ -45,6 +45,6 @@ Live verification loaded Example Domain and Wikipedia successfully. Google searc
 
 ## GitHub Pages and another device
 
-Your intended frontend URL is `https://simeonmes.github.io/remote-browser/`. Publishing those static assets does not move Chromium or the backend off your laptop. Entering an access key authenticates a connection that is already reachable; it does not create that connection.
+Your published frontend URL is `https://simeonmes.github.io/remote-browser/`. Publishing those static assets does not move Chromium or the backend off your laptop. Entering an access key authenticates a connection that is already reachable; it does not create that connection.
 
-The backend still listens only on this laptop's loopback interface. On a school Chromebook, `127.0.0.1` means the Chromebook. Remote use therefore remains unavailable until a separately authorized backend deployment provides permitted routing, HTTPS/WSS and reviewed access controls. No deployment or network exposure was performed. See [GitHub Pages instructions](github-pages.md).
+The backend still listens only on this laptop's loopback interface. On a school Chromebook, `127.0.0.1` means the Chromebook. The optional `npm run remote` command now provides the authorized HTTPS/WSS connection and updates Pages. Keep that command running on the Victus. See [remote access](remote-access.md). See [GitHub Pages instructions](github-pages.md).

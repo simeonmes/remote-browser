@@ -1,5 +1,11 @@
 # Verification
 
+## Hosted HTTPS and Pages - October 27, 2026
+
+171 regular tests pass, including exact Pages Origin, loopback upstream Host, CORS preflight and authentication checks. Hosted Windows/Linux checks and browser tests passed for commit `196df36`. [The first Pages deployment](https://github.com/simeonmes/remote-browser/actions/runs/40600965717) succeeded. The live published frontend returned HTTP 200 and passed login, Chromium streaming, Example Domain navigation, stop and logout through HTTPS/WSS with no frontend errors. Anonymous API calls returned 401; a foreign Origin returned 403.
+
+The first temporary hostname did not pass its 30-second readiness window; it was closed automatically. A second endpoint passed after DNS startup delay. The launcher now allows up to two minutes, reports readiness errors, and checks authentication before deployment. The actual Chromebook/network remains untested.
+
 ## Compositor display upgrade - October 27, 2026
 
 170 regular tests and 14 real Chromium tests pass. Typechecks, production/Pages builds, root UI regression checks, the Pages-path public UI benchmark and compositor cleanup profiling also pass. The latest end-to-end benchmark displayed 30.0 fps at 1039 x 584, with 97 ms median / 105 ms maximum click-to-visible-pixel delay across five samples and 1.62 Mbps display payload. Ten public sessions with compositor capture enabled retained 1.71 MiB after warming and GC. See [methodology and limits](display-performance.md).

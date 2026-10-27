@@ -62,6 +62,20 @@ export async function publishPages(backendUrl) {
     endpoint.hash
   )
     throw new Error('Expected the HTTPS origin of this Cloudflare Quick Tunnel.');
+  const health = await fetch(endpoint.origin + '/health', {
+    headers: { Origin: pagesOrigin },
+    signal: AbortSignal.timeout(10_000),
+    redirect: 'error',
+  });
+  if (!health.ok || (await health.json()).service !== 'personal-remote-browser')
+    throw new Error('The remote backend is offline; deployment was not requested.');
+  const protectedStatus = await fetch(endpoint.origin + '/api/status', {
+    headers: { Origin: pagesOrigin },
+    signal: AbortSignal.timeout(10_000),
+    redirect: 'error',
+  });
+  if (protectedStatus.status !== 401)
+    throw new Error('Remote authentication check failed; deployment was not requested.');
   const api = githubClient();
   const variable = `/repos/${repository}/actions/variables/VITE_BACKEND_URL`;
   const current = await api(variable);

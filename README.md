@@ -2,7 +2,7 @@
 
 A Windows-first personal Chromium application built with React, TypeScript, Vite, Tailwind CSS, Lucide, Fastify, Playwright and WebSockets.
 
-**Phases 1–6 are implemented locally.** The app supports a live viewport, mouse and keyboard input, scrolling, navigation history, resizing, authentication and connection recovery. The frontend is prepared for GitHub Pages. Nothing has been pushed or deployed publicly.
+**Phases 1–6 are implemented locally.** The app supports a live viewport, mouse and keyboard input, scrolling, navigation history, resizing, authentication and connection recovery. The frontend is published at https://simeonmes.github.io/remote-browser/. The optional remote-access command connects it to Chromium on the Victus.
 
 The default **public browsing mode** supports public HTTP/HTTPS websites, JavaScript, forms, session cookies, WebSockets and address-bar search. A local network guard blocks private/reserved destinations. The original restricted allowlist mode remains available for tests. This is still a single-viewport remote-browser prototype: no audio, file transfer, persistent profile or full tab UI. Network listeners remain localhost-only. See [public browsing and limits](docs/public-browsing.md).
 
@@ -23,7 +23,7 @@ Click the live viewport to focus remote input. Type normally, paste text, scroll
 
 Setup generates a random key without printing it and preserves existing configuration. The browser download stays in the ignored project `.playwright` directory. It does not install a system browser. If PowerShell blocks `npm.ps1`, use `npm.cmd`; no execution-policy changes are needed.
 
-The frontend listens on **127.0.0.1:5173**, the backend on **127.0.0.1:4318**. No firewall rules, tunnels, public listeners or browser debugging ports are configured. On another device, `127.0.0.1` refers to that device, not this laptop. Remote access requires a separately approved network deployment.
+The frontend listens on **127.0.0.1:5173**, the backend on **127.0.0.1:4318**. Ordinary development does not configure public access. On another device, `127.0.0.1` refers to that device, not this laptop. The separately invoked `npm run remote` command provides an authenticated public HTTPS connection without changing firewall rules or exposing Chromium debugging ports.
 
 ## Commands
 
@@ -105,7 +105,7 @@ For the optional browser-only connection from another device, see [remote access
 
 `npm run build:pages` produces independently deployable `frontend/dist` assets. **GitHub Pages hosts only the static frontend. It cannot run Node.js, Playwright, Chromium or the WebSocket backend.** An accessible frontend does not mean its backend connection is reachable or permitted.
 
-The Pages workflow is manual. Publishing requires its explicit `publish` checkbox; ordinary pushes run checks only. No GitHub repository, remote, push, hosted workflow or deployment was created during this work. See [publishing instructions and network limitations](docs/github-pages.md).
+The Pages workflow is manual; ordinary pushes run checks only. The remote-access launcher updates the backend URL and requests this workflow with publication enabled. Source is hosted in `simeonmes/remote-browser`, and the first public deployment passed its end-to-end verification. See [publishing instructions and network limitations](docs/github-pages.md).
 
 ## Project and verification
 

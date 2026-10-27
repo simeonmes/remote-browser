@@ -17,6 +17,7 @@ await verifyTunnel();
 let backend;
 let tunnel;
 let closing = false;
+let ownsState = false;
 const children = [];
 const state = new URL('.remote/connection.json', root);
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -25,7 +26,7 @@ async function close() {
   closing = true;
   for (const child of children.reverse()) child.kill();
   await backend?.close();
-  await rm(state, { force: true });
+  if (ownsState) await rm(state, { force: true });
 }
 process.once('SIGINT', () => {
   void close();
@@ -47,9 +48,9 @@ try {
   } catch {
     /* Start our backend. */
   }
-  if (response && !response.ok)
+  if (response)
     throw new Error(
-      'Port is already in use by a backend without the Pages origin. Stop npm run dev first.',
+      'A backend is already running. If remote access is active, use the existing Pages link. Otherwise stop npm run dev before starting remote access.',
     );
   if (!response) {
     const allowed = [
@@ -123,7 +124,9 @@ try {
     });
   });
   let ready = false;
-  for (let attempt = 0; attempt < 30; attempt++) {
+  let reachabilityError = '';
+  const readyDeadline = Date.now() + 120_000;
+  for (let attempt = 0; Date.now() < readyDeadline; attempt++) {
     if (closing) throw new Error('Tunnel stopped.');
     try {
       const health = await fetch(endpoint + '/health', {
@@ -134,10 +137,15 @@ try {
         ready = true;
         break;
       }
-    } catch {}
+      reachabilityError = `HTTP ${health.status}`;
+    } catch (error) {
+      reachabilityError = error.cause?.code || error.name;
+    }
+    if (attempt % 15 === 0) console.log(`Waiting for the HTTPS endpoint: ${reachabilityError}.`);
     await pause(1000);
   }
-  if (!ready) throw new Error('The HTTPS endpoint did not pass its health check.');
+  if (!ready)
+    throw new Error(`The HTTPS endpoint did not pass its health check (${reachabilityError}).`);
   const anonymous = await fetch(endpoint + '/api/status', {
     headers: { Origin: pagesOrigin },
     signal: AbortSignal.timeout(5000),
@@ -153,6 +161,7 @@ try {
       2,
     ) + '\n',
   );
+  ownsState = true;
   console.log(
     `Remote API ready: ${endpoint}\nFrontend: ${pagesUrl}\nAuthentication required. No access key is stored in GitHub.`,
   );
