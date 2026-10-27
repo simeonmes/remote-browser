@@ -26,7 +26,7 @@ export class StreamHub {
     app.get('/api/sessions/:id/stream', { websocket: true }, (socket, request) => {
       const params = sessionParamsSchema.safeParse(request.params);
       if (!params.success || this.sockets.size >= 2) {
-        socket.close(4400, 'Connection not available.');
+        socket.terminate();
         return;
       }
       this.sockets.add(socket);
@@ -37,6 +37,7 @@ export class StreamHub {
       let running = false;
       let pumping = false;
       let sequence = 0;
+      let alive = true;
       let lastFrame = '';
       let lastStatus = '';
       let lastId = 0;
@@ -44,12 +45,15 @@ export class StreamHub {
       let replenished = Date.now();
       const queue: Command[] = [];
       const send = (message: ServerMessage) => {
-        if (!closed && socket.readyState === 1) socket.send(JSON.stringify(message));
+        if (!closed && socket.readyState === 1 && socket.bufferedAmount < 512 * 1024)
+          socket.send(JSON.stringify(message));
       };
       const authenticate = () => {
         if (!token)
           throw new AppError(401, 'UNAUTHORIZED', 'Authenticate the display connection first.');
         this.auth.authenticate(`Bearer ${token}`);
+        if (this.active && this.active !== socket)
+          throw new AppError(409, 'CONTROLLER_REPLACED', 'Another tab controls this session.');
         const session = this.engine.status();
         if (!session || session.id !== id)
           throw new AppError(404, 'SESSION_NOT_FOUND', 'The browser session ended.');
@@ -74,6 +78,7 @@ export class StreamHub {
             const command = queue.shift()!;
             try {
               authenticate();
+              if (socket.readyState !== 1 || this.active !== socket) break;
               if (!visible)
                 throw new AppError(
                   409,
@@ -97,7 +102,20 @@ export class StreamHub {
           running = false;
         }
       };
-      const authDeadline = setTimeout(() => socket.close(4401, 'Authentication required.'), 5000);
+      const heartbeat = setInterval(() => {
+        if (!alive || socket.bufferedAmount > 2 * 1024 * 1024) {
+          socket.terminate();
+          return;
+        }
+        alive = false;
+        socket.ping();
+        if (token) send({ type: 'heartbeat' });
+      }, 15_000);
+      heartbeat.unref();
+      socket.on('pong', () => {
+        alive = true;
+      });
+      const authDeadline = setTimeout(() => socket.terminate(), 5000);
       const pump = setInterval(() => {
         if (!token || closed || pumping) return;
         pumping = true;
@@ -139,7 +157,7 @@ export class StreamHub {
 
       // Attach synchronously: the browser can send authentication immediately on open.
       socket.on('message', (data, binary) => {
-        if (closed) return;
+        if (closed || socket.readyState !== 1) return;
         const now = Date.now();
         allowance = Math.min(120, allowance + (now - replenished) * 0.06);
         replenished = now;
@@ -162,10 +180,13 @@ export class StreamHub {
           try {
             this.auth.authenticate(`Bearer ${message.token}`);
             token = message.token;
-            const session = authenticate();
+            const session = this.engine.status();
+            if (!session || session.id !== id)
+              throw new AppError(404, 'SESSION_NOT_FOUND', 'The browser session ended.');
             clearTimeout(authDeadline);
             this.active?.close(4409, 'Another controller connected.');
             this.active = socket;
+            void this.engine.releaseInput();
             send({ type: 'ready', session });
           } catch (error) {
             fail(error);
@@ -199,6 +220,7 @@ export class StreamHub {
         queue.length = 0;
         clearTimeout(authDeadline);
         clearInterval(pump);
+        clearInterval(heartbeat);
         this.sockets.delete(socket);
         if (this.active === socket) {
           this.active = undefined;

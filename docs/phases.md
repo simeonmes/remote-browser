@@ -18,7 +18,7 @@ Completed: authenticated WebSockets, bounded binary JPEG frames, backpressure, m
 
 ## Phase 4 — complete security and recovery
 
-Browser ownership, expiry/logout teardown and basic crash recovery are already implemented. Expand egress protections and recovery for active browsing; validate WebSocket origins, tickets and input. Design explicitly authorized TLS/private-network access. Do not open any listener beyond loopback without approval.
+Completed: controller ownership, expiry/logout teardown, crash recovery, authenticated WebSocket origin checks, bounded input queues, rate limits, heartbeat detection and reconnection without replay. Chromium input has an operation deadline. Native HTML remains constrained by the existing resource fetcher. Remote network access is deliberately not configured. See [Phase 4 verification](phase-4.md).
 
 ## Phase 5 — correctness and responsiveness
 

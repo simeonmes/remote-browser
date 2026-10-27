@@ -79,7 +79,10 @@ export async function buildApp(config: Config, options: { engine?: BrowserEngine
       .send({ error: { code: 'NOT_FOUND', message: 'This API route does not exist.' } }),
   );
 
-  await app.register(websocket, { options: { maxPayload: 8192, perMessageDeflate: false } });
+  await app.register(websocket, {
+    options: { maxPayload: 8192, perMessageDeflate: false },
+    errorHandler: (_error, socket) => socket.terminate(),
+  });
 
   app.addHook('onRequest', async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
@@ -114,7 +117,7 @@ export async function buildApp(config: Config, options: { engine?: BrowserEngine
 
   streams.register(app);
 
-  app.get('/health', async () => ({ status: 'ok', service: 'personal-remote-browser', phase: 3 }));
+  app.get('/health', async () => ({ status: 'ok', service: 'personal-remote-browser', phase: 4 }));
   app.post(
     '/api/auth/login',
     { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } },
@@ -149,7 +152,7 @@ export async function buildApp(config: Config, options: { engine?: BrowserEngine
         return reply.code(204).send();
       });
       api.get('/status', async (request): Promise<BrowserStatus> => ({
-        phase: 3,
+        phase: 4,
         engine: 'playwright',
         session: engine.status(),
         capabilities: { browser: true, display: true, input: true },

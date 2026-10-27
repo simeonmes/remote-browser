@@ -109,3 +109,48 @@ it('stops hidden-tab capture and tears down sockets on logout', async () => {
   await closed;
   expect(engine.status()).toBeNull();
 });
+
+it('replaces the old controller, releases held buttons and reconnects to the same browser', async () => {
+  const release = vi.spyOn(engine, 'releaseInput');
+  const first = await connect();
+  await authenticate(first);
+  const closed = new Promise<number>((resolve) => first.once('close', resolve));
+  const second = await connect();
+  await authenticate(second);
+  expect(await closed).toBe(4409);
+  expect(release).toHaveBeenCalled();
+  expect(engine.status()?.id).toBe(path.split('/')[3]);
+});
+it('rejects oversized and binary commands and excessive input rates', async () => {
+  for (const payload of [Buffer.alloc(10), 'x'.repeat(9000)]) {
+    const ws = await connect();
+    await authenticate(ws);
+    const closed = new Promise<number>((resolve) => ws.once('close', resolve));
+    ws.send(payload);
+    expect([4400, 1009]).toContain(await closed);
+  }
+  const ws = await connect();
+  await authenticate(ws);
+  const closed = new Promise<number>((resolve) => ws.once('close', resolve));
+  for (let n = 0; n < 150; n++) ws.send(JSON.stringify({ type: 'visibility', visible: true }));
+  expect(await closed).toBe(4429);
+});
+it('sanitizes unexpected engine errors', async () => {
+  vi.spyOn(engine, 'history').mockRejectedValue(new Error('sensitive internal path'));
+  const ws = await connect();
+  await authenticate(ws);
+  const reply = message(ws);
+  ws.send(JSON.stringify({ type: 'navigation', id: 1, action: 'home' }));
+  const result = JSON.parse((await reply).toString());
+  expect(result).toMatchObject({ type: 'error', code: 'BROWSER_ERROR' });
+  expect(result.message).not.toContain('sensitive');
+});
+
+it('closes an authenticated stream at absolute token expiration', async () => {
+  const ws = await connect();
+  await authenticate(ws);
+  const closed = new Promise<number>((resolve) => ws.once('close', resolve));
+  const future = Date.now() + 1_801_000;
+  vi.spyOn(Date, 'now').mockReturnValue(future);
+  expect(await closed).toBe(4401);
+});

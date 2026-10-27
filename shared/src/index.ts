@@ -97,6 +97,7 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('navigation'), id: commandId, action: navigationActionSchema }),
 ]);
 export const serverMessageSchema = z.discriminatedUnion('type', [
+  z.strictObject({ type: z.literal('heartbeat') }),
   z.strictObject({ type: z.literal('ready'), session: browserSessionSchema }),
   z.strictObject({ type: z.literal('status'), session: browserSessionSchema }),
   z.strictObject({ type: z.literal('ack'), id: commandId, session: browserSessionSchema }),

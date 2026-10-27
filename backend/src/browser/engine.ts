@@ -86,6 +86,7 @@ export class PlaywrightEngine implements BrowserEngine {
     startupDeadline.unref();
     this.controller = new AbortController();
     this.resourceCount = 0;
+    this.inFlightResources = 0;
     this.resourceBytes = 0;
     this.historyUrls = [];
     this.historyIndex = -1;
@@ -140,6 +141,7 @@ export class PlaywrightEngine implements BrowserEngine {
         await context.close();
         throw new Error('Cancelled');
       }
+      context.setDefaultTimeout(5000);
       await context.routeWebSocket('**/*', (route) => route.close());
       const controller = this.controller;
       await context.route('**/*', async (route) => {
@@ -208,7 +210,7 @@ export class PlaywrightEngine implements BrowserEngine {
           }
           await route.abort('blockedbyclient').catch(() => {});
         } finally {
-          if (counted) this.inFlightResources--;
+          if (counted && generation === this.generation) this.inFlightResources--;
         }
       });
       const page = await context.newPage();
@@ -307,7 +309,9 @@ export class PlaywrightEngine implements BrowserEngine {
       await page.goto(target, { waitUntil: 'load', timeout: 20_000 });
       if (generation !== this.generation || !this.session) throw new Error('Cancelled');
       this.session.url = page.url();
-      this.session.title = (await page.title()).slice(0, 200);
+      const title = (await page.title()).slice(0, 200);
+      if (generation !== this.generation || !this.session) throw new Error('Cancelled');
+      this.session.title = title;
       this.session.state = 'ready';
       if (typeof history === 'number') this.historyIndex = history;
       else if (history === 'replace' && this.historyIndex >= 0)
@@ -418,6 +422,7 @@ export class PlaywrightEngine implements BrowserEngine {
     try {
       await this.releaseInput();
       await this.page.setViewportSize(viewport);
+      this.requireSession(id);
       session.viewport = viewport;
       session.revision++;
       this.cached = undefined;
@@ -426,6 +431,16 @@ export class PlaywrightEngine implements BrowserEngine {
       this.operation = false;
       void this.drainNavigation();
     }
+  }
+
+  private inputDeadline() {
+    const generation = this.generation;
+    const timer = setTimeout(() => {
+      if (generation === this.generation)
+        void this.fail('Chromium stopped responding. Stop this session and start again.');
+    }, 6000);
+    timer.unref();
+    return timer;
   }
 
   async input(id: string, input: BrowserInput): Promise<BrowserSession> {
@@ -447,6 +462,7 @@ export class PlaywrightEngine implements BrowserEngine {
       );
     this.operation = true;
     this.cached = undefined;
+    const deadline = this.inputDeadline();
     try {
       if (input.kind === 'pointer') {
         this.pointer = { x: input.x, y: input.y };
@@ -483,8 +499,9 @@ export class PlaywrightEngine implements BrowserEngine {
             : `${input.control ? 'Control+' : ''}${input.shift ? 'Shift+' : ''}${input.key}`;
         await page.keyboard.press(key);
       }
-      return this.status()!;
+      return this.requireSession(id);
     } finally {
+      clearTimeout(deadline);
       this.operation = false;
       void this.drainNavigation();
     }
@@ -499,10 +516,11 @@ export class PlaywrightEngine implements BrowserEngine {
   }
 
   async releaseInput(): Promise<void> {
+    const channel = this.inputChannel;
     const buttons = [...this.pressedButtons];
     this.pressedButtons.clear();
     for (const button of buttons)
-      await this.inputChannel
+      await channel
         ?.send('Input.dispatchMouseEvent', {
           type: 'mouseReleased',
           ...this.pointer,

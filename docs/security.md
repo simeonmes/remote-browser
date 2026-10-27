@@ -20,13 +20,13 @@ Chromium receives fulfilled document/style/image/font requests; a loopback deny 
 
 The integration suite injects an internal fixture fetcher that maps `https://example.com/` to its own local test website. There is no production environment variable or API field that enables this mapping or permits private targets.
 
-Read [Phase 2 implementation and limits](phase-2.md). This is a constrained read-only prototype, not a full host network sandbox. Active scripts, input, POST requests, additional transports and remote access need further threat review and tests. The program runs under your Windows account; a browser exploit is outside these application-level guarantees. Normal operation uses Chromium's own sandbox and never disables TLS verification.
+Read [Phase 2 implementation and limits](phase-2.md). This is a constrained interactive prototype, not a full host network sandbox. Input is limited to native HTML controls and GET navigation. Active scripts, POST requests, additional transports and remote access need further threat review and tests. The program runs under your Windows account; a browser exploit is outside these application-level guarantees. Normal operation uses Chromium's own sandbox and never disables TLS verification.
 
 ## Required before any remote access
 
 Keep this phase local. Later remote use needs deliberate authorization, a permitted private-network deployment, TLS for HTTPS/WSS, restricted inbound access, appropriate host/origin validation, and explicit review of actual network boundaries. Never assume that opening GitHub Pages makes a backend connection allowed. Do not disable browser security, TLS validation, Windows firewall protections, or administrator-enforced restrictions to make it work.
 
-The future WebSocket handshake must validate origin and authenticate before streaming or accepting input; do not send the long-lived key or bearer token in a URL. Use a short-lived, single-use upgrade ticket or an authenticated initial message with a short deadline, strict message sizes, input-rate limits, session ownership, and expiry enforcement. Reconnection must not create duplicate browsers.
+The WebSocket handshake validates Host and Origin. A first-message bearer token must authenticate within five seconds, before any frames or input. Messages are limited to 8 KiB, queues to 32 commands, and input to a token bucket of 120 burst / 60 per second. Exactly one controller is active, with at most two admitted sockets during takeover. Tokens are rechecked before and after asynchronous operations. Native ping/pong and application heartbeats detect dead connections. Hidden tabs pause capture and release buttons; reconnects retain the existing browser and never replay commands. Session expiration, replacement login, logout and server shutdown tear down the browser and display connections.
 
 ## Secret hygiene
 

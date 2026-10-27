@@ -53,10 +53,16 @@ export class RemoteStream {
     this.socket = socket;
     socket.binaryType = 'arraybuffer';
     let sequence = 0;
+    let receivedAt = Date.now();
+    const watchdog = setInterval(() => {
+      if (Date.now() - receivedAt > (this.ready ? 35_000 : 8000)) socket.close();
+    }, 2000);
+    const clearWatchdog = () => clearInterval(watchdog);
     socket.onopen = () => socket.send(JSON.stringify({ type: 'auth', token: this.token }));
     socket.onmessage = (event: MessageEvent<unknown>) => {
       if (this.stopped || this.socket !== socket) return;
       try {
+        receivedAt = Date.now();
         if (event.data instanceof ArrayBuffer) {
           if (!this.ready) throw new Error('Display sent a frame before authentication.');
           const frame = decodeFrame(event.data);
@@ -66,6 +72,7 @@ export class RemoteStream {
           return;
         }
         const message = serverMessageSchema.parse(JSON.parse(String(event.data)));
+        if (message.type === 'heartbeat') return;
         if (message.type === 'error') {
           const pending = message.id ? this.pending.get(message.id) : undefined;
           if (pending && message.id) {
@@ -98,6 +105,7 @@ export class RemoteStream {
     };
     socket.onerror = () => this.callbacks.error('The display connection was interrupted.');
     socket.onclose = (event) => {
+      clearWatchdog();
       if (this.socket !== socket) return;
       this.ready = false;
       this.rejectPending();

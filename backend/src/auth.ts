@@ -11,7 +11,7 @@ export class AuthService {
   constructor(
     secret: string,
     private readonly ttlSeconds: number,
-    private readonly now = Date.now,
+    private readonly now = () => Date.now(),
   ) {
     this.secretHash = digest(secret);
   }
