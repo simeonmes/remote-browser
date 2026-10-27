@@ -27,7 +27,8 @@
     "check": "npm run typecheck && npm test && npm run build",
     "start": "npm run start -w backend",
     "smoke": "npm run build && node scripts/smoke.mjs",
-    "browser:install": "node scripts/install-browser.mjs"
+    "browser:install": "node scripts/install-browser.mjs",
+    "profile": "npm run build -w shared && npm run build -w backend && node --expose-gc scripts/profile.mjs"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "7.0.1",

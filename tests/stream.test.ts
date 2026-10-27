@@ -154,3 +154,35 @@ it('closes an authenticated stream at absolute token expiration', async () => {
   vi.spyOn(Date, 'now').mockReturnValue(future);
   expect(await closed).toBe(4401);
 });
+
+it('suppresses unchanged frames during input and pauses capture under backpressure', async () => {
+  const ws = await connect();
+  let frames = 0;
+  ws.on('message', (_data, binary) => {
+    if (binary) frames++;
+  });
+  const first = message(ws, true);
+  await authenticate(ws);
+  await first;
+  ws.send(JSON.stringify({ type: 'input', id: 1, input: { kind: 'release', revision: 1 } }));
+  await new Promise((resolve) => setTimeout(resolve, 650));
+  expect(frames).toBe(1);
+  const serverSocket = [...app.websocketServer.clients][0]!;
+  const capture = vi.spyOn(engine, 'frame');
+  capture.mockClear();
+  Object.defineProperty(serverSocket, 'bufferedAmount', { configurable: true, get: () => 600_000 });
+  await new Promise((resolve) => setTimeout(resolve, 450));
+  expect(capture).not.toHaveBeenCalled();
+  Object.defineProperty(serverSocket, 'bufferedAmount', { configurable: true, get: () => 0 });
+});
+it('releases admitted sockets after repeated connection cycles', async () => {
+  for (let n = 0; n < 12; n++) {
+    const ws = await connect();
+    await authenticate(ws);
+    const closed = new Promise((resolve) => ws.once('close', resolve));
+    ws.close();
+    await closed;
+    await expect.poll(() => app.websocketServer.clients.size).toBe(0);
+  }
+  expect(engine.status()?.id).toBe(path.split('/')[3]);
+});

@@ -47,6 +47,7 @@ export function RemoteViewport({
   }
   useEffect(() => {
     const target = element.current!;
+    let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
     let wheelTimer: ReturnType<typeof setTimeout> | undefined;
     let wheel:
@@ -56,14 +57,19 @@ export function RemoteViewport({
       if (!entry) return;
       const width = Math.max(320, Math.min(1920, Math.round(entry.contentRect.width)));
       const height = Math.max(240, Math.min(1080, Math.round((width * 9) / 16)));
-      timer = setTimeout(() => {
+      const applyResize = () => {
+        if (disposed) return;
         const current = latest.current;
         if (
           current.session.state === 'ready' &&
           (width !== current.session.viewport.width || height !== current.session.viewport.height)
         )
-          void current.resize({ width, height }).catch(() => {});
-      }, 300);
+          void current.resize({ width, height }).catch(() => {
+            if (!disposed) timer = setTimeout(applyResize, 1000);
+          });
+        else if (current.session.state === 'loading') timer = setTimeout(applyResize, 1000);
+      };
+      timer = setTimeout(applyResize, 300);
     });
     observer.observe(target);
     const scroll = (event: WheelEvent) => {
@@ -89,6 +95,7 @@ export function RemoteViewport({
     };
     target.addEventListener('wheel', scroll, { passive: false });
     return () => {
+      disposed = true;
       observer.disconnect();
       clearTimeout(timer);
       clearTimeout(wheelTimer);
@@ -145,6 +152,11 @@ export function RemoteViewport({
         }}
         onCompositionEnd={(event) => sendText(event.data)}
         onKeyDown={(event) => {
+          if (event.key === 'Escape' && event.shiftKey) {
+            event.preventDefault();
+            event.currentTarget.blur();
+            return;
+          }
           if (event.nativeEvent.isComposing || shown.current?.revision !== session.revision) return;
           if (
             !event.ctrlKey &&
@@ -183,6 +195,29 @@ export function RemoteViewport({
           className="remote-frame"
           draggable={false}
         />
+      </div>
+      <div className="remote-scroll-controls">
+        <span>Focus the page to type. Shift+Escape releases focus.</span>
+        {([-1, 1] as const).map((direction) => (
+          <button
+            key={direction}
+            type="button"
+            aria-label={direction < 0 ? 'Scroll remote page up' : 'Scroll remote page down'}
+            onClick={() => {
+              if (shown.current?.revision === session.revision)
+                sendInput({
+                  kind: 'wheel',
+                  x: session.viewport.width / 2,
+                  y: session.viewport.height / 2,
+                  deltaX: 0,
+                  deltaY: direction * session.viewport.height * 0.7,
+                  revision: session.revision,
+                });
+            }}
+          >
+            {direction < 0 ? 'Scroll up' : 'Scroll down'}
+          </button>
+        ))}
       </div>
       <form
         className="remote-text-form"

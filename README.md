@@ -2,7 +2,7 @@
 
 A Windows-first, single-user remote Chromium project. React, TypeScript, Vite, Tailwind CSS and Lucide power the frontend; Node.js, TypeScript, Fastify and Playwright power the backend.
 
-**Current milestone: Phase 4 ? security and recovery.** Start an isolated Chromium session, browse allowlisted HTTPS test pages, and use mouse, keyboard, scrolling, navigation history and responsive resizing. Binary JPEG updates arrive over an authenticated WebSocket, up to 5 fps. Page scripts remain disabled and all listeners remain localhost-only. See [Phase 3 details and limitations](docs/phase-3.md).
+**Current milestone: Phase 5 - testing and performance.** Start an isolated Chromium session, browse allowlisted HTTPS test pages, and use mouse, keyboard, scrolling, navigation history and responsive resizing. Binary JPEG updates arrive over an authenticated WebSocket, up to 5 fps. Page scripts remain disabled and all listeners remain localhost-only. See [Phase 3 details and limitations](docs/phase-3.md).
 
 ## Start on Windows
 

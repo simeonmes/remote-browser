@@ -36,7 +36,7 @@ export interface BrowserEngine {
   releaseInput(): Promise<void>;
 }
 
-/** One ephemeral read-only Chromium session, with resources fulfilled by Node. */
+/** One ephemeral Chromium session with GET-only resources fulfilled by Node. */
 export class PlaywrightEngine implements BrowserEngine {
   private browser: Browser | undefined;
   private page: Page | undefined;
@@ -207,6 +207,7 @@ export class PlaywrightEngine implements BrowserEngine {
               error instanceof AppError
                 ? error.message
                 : 'The page could not be loaded under the test browsing policy.';
+            if (this.session) this.session.error = this.blockedNavigation;
           }
           await route.abort('blockedbyclient').catch(() => {});
         } finally {
@@ -303,7 +304,9 @@ export class PlaywrightEngine implements BrowserEngine {
           ).href;
           continue;
         }
-        this.documentResource = { url: target, resource };
+        const resourceUrl = new URL(target);
+        resourceUrl.hash = '';
+        this.documentResource = { url: resourceUrl.href, resource };
         break;
       }
       await page.goto(target, { waitUntil: 'load', timeout: 20_000 });

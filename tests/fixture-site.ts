@@ -26,7 +26,10 @@ export async function startFixtureSite() {
       return;
     }
     response.writeHead(200, { 'content-type': 'text/html' });
-    const title = request.url === '/second' ? 'Second fixture page' : 'Local browser fixture';
+    const title =
+      new URL(request.url ?? '/', 'http://fixture').pathname === '/second'
+        ? 'Second fixture page'
+        : 'Local browser fixture';
     response.end(
       `<!doctype html><html><head><title>${title}</title><link rel="stylesheet" href="/style.css"></head><body><h1>${title}</h1><p>Rendered by real Chromium through the restricted resource fetcher.</p><form action="/second" method="get"><input id="remote-input" name="text" placeholder="Type here"><button>Submit</button></form><label><input id="check" type="checkbox">Check me</label><p><a id="next" href="/second">Next page</a></p><div style="height:1800px">Scroll down</div><p>End of page</p><script>document.title='SCRIPT RAN';fetch('/script-ran')</script><img src="http://127.0.0.1:4318/health"><img src="https://outside.example/blocked.png"></body></html>`,
     );

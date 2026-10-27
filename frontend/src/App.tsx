@@ -327,7 +327,7 @@ export default function App({ api }: { api: RemoteApi }) {
             <ShieldCheck size={13} /> Built for personal, authorized browsing
           </span>
           <span>
-            Phase 2 <span>•</span> Read-only Chromium
+            Phase 5 <span>•</span> Tested local browsing
           </span>
         </footer>
       </main>

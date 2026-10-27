@@ -352,7 +352,7 @@ export function BrowserWindow({
             className={`status-dot ${session?.state === 'ready' && connected ? 'green' : ''}`}
           />
           {session
-            ? `${session.state === 'ready' ? 'Chromium running' : session.state} · Read-only`
+            ? `${session.state === 'ready' ? 'Chromium running' : session.state} · ${streamState}`
             : 'No active browser session'}
         </span>
         {session ? (
@@ -371,8 +371,8 @@ export function BrowserWindow({
       </div>
       {session && (
         <div className="display-caption">
-          {session.viewport.width} × {session.viewport.height} · JPEG updates up to 1 fps · Mouse
-          and keyboard arrive in Phase 3
+          {session.viewport.width} × {session.viewport.height} · Up to 5 fps while active · Page
+          scripts disabled
         </div>
       )}
     </section>

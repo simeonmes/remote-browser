@@ -117,7 +117,7 @@ export async function buildApp(config: Config, options: { engine?: BrowserEngine
 
   streams.register(app);
 
-  app.get('/health', async () => ({ status: 'ok', service: 'personal-remote-browser', phase: 4 }));
+  app.get('/health', async () => ({ status: 'ok', service: 'personal-remote-browser', phase: 5 }));
   app.post(
     '/api/auth/login',
     { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } },
@@ -152,7 +152,7 @@ export async function buildApp(config: Config, options: { engine?: BrowserEngine
         return reply.code(204).send();
       });
       api.get('/status', async (request): Promise<BrowserStatus> => ({
-        phase: 4,
+        phase: 5,
         engine: 'playwright',
         session: engine.status(),
         capabilities: { browser: true, display: true, input: true },

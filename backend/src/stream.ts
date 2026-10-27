@@ -39,6 +39,8 @@ export class StreamHub {
       let sequence = 0;
       let alive = true;
       let lastFrame = '';
+      let activityAt = Date.now();
+      let capturedAt = 0;
       let lastStatus = '';
       let lastId = 0;
       let allowance = 120;
@@ -93,7 +95,7 @@ export class StreamHub {
                     : await this.engine.history(id, command.action);
               authenticate();
               send({ type: 'ack', id: command.id, session });
-              lastFrame = '';
+              activityAt = Date.now();
             } catch (error) {
               fail(error, command.id);
             }
@@ -126,8 +128,12 @@ export class StreamHub {
             if (snapshot !== lastStatus) {
               send({ type: 'status', session });
               lastStatus = snapshot;
+              activityAt = Date.now();
             }
             if (!visible || session.state !== 'ready' || socket.bufferedAmount > 512 * 1024) return;
+            const interval = Date.now() - activityAt < 2000 ? 200 : 1000;
+            if (Date.now() - capturedAt < interval) return;
+            capturedAt = Date.now();
             const frame = await this.engine.frame(id);
             authenticate();
             const key = `${frame.revision}:${frame.etag}`;
@@ -199,6 +205,7 @@ export class StreamHub {
             throw new AppError(400, 'INVALID_MESSAGE', 'Already authenticated.');
           if (message.type === 'visibility') {
             visible = message.visible;
+            if (visible) activityAt = Date.now();
             if (!visible) void this.engine.releaseInput();
             return;
           }

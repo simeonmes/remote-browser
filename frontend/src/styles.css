@@ -1007,3 +1007,22 @@ h1 {
   font-size: 12px;
   padding: 8px;
 }
+
+.remote-scroll-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px 0;
+  color: #96abae;
+  font-size: 11px;
+}
+.remote-scroll-controls span {
+  flex: 1;
+}
+.remote-scroll-controls button {
+  color: #a5d6c2;
+  padding: 6px;
+}
+.remote-scroll-controls {
+  background: #171f23;
+}

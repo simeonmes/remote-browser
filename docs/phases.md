@@ -22,7 +22,7 @@ Completed: controller ownership, expiry/logout teardown, crash recovery, authent
 
 ## Phase 5 — correctness and responsiveness
 
-Expand browser session, navigation, auth, API, fixture and connection-failure integration tests. Test disconnect during capture/navigation and concurrent commands. Measure bandwidth, frame latency, resource limits and slow-client behavior before tuning.
+Completed: 149 unit/API/frontend tests, nine real-browser tests, UI smoke, capture measurements and a warmed ten-cycle memory profile. Added adaptive capture, unchanged-frame suppression tests, backpressure checks, native GET forms, fragments, resize retry and mobile scrolling. See [Phase 5 results](phase-5.md).
 
 ## Phase 6 — GitHub Pages validation
 

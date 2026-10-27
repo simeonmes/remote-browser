@@ -38,7 +38,7 @@ describe('backend HTTP API', () => {
     const response = await app.inject({ url: '/api/status', headers: authHeaders });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
-      phase: 4,
+      phase: 5,
       engine: 'playwright',
       session: null,
       capabilities: { browser: true },

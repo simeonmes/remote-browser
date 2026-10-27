@@ -88,6 +88,31 @@ describe('real Chromium with the isolated local test website', () => {
     ).rejects.toMatchObject({ code: 'INVALID_COORDINATES' });
   });
 
+  it('submits a native GET form and handles URL fragments without routing loops', async () => {
+    let session = await engine.start({ width: 800, height: 600 });
+    const page = (engine as unknown as { page: Page }).page;
+    await page.locator('#remote-input').focus();
+    await engine.input(session.id, {
+      kind: 'text',
+      text: 'hello world',
+      revision: session.revision,
+    });
+    await engine.input(session.id, {
+      kind: 'key',
+      key: 'Enter',
+      shift: false,
+      control: false,
+      revision: session.revision,
+    });
+    await expect
+      .poll(() => engine.status()?.url)
+      .toBe('https://example.com/second?text=hello+world');
+    session = await engine.navigate(session.id, 'https://example.com/#section');
+    expect(session.state).toBe('ready');
+    expect(session.url).toBe('https://example.com/#section');
+    expect((await engine.frame(session.id)).bytes.length).toBeGreaterThan(5000);
+  });
+
   it('renders the page, permits CSS, blocks scripts and private/unlisted subresources, and captures a JPEG', async () => {
     const session = await engine.start({ width: 1280, height: 720 });
     expect(session.title).toBe('Local browser fixture');
