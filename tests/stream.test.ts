@@ -186,3 +186,26 @@ it('releases admitted sockets after repeated connection cycles', async () => {
   }
   expect(engine.status()?.id).toBe(path.split('/')[3]);
 });
+
+it('bounds the display to two unacknowledged frames and resumes on presentation', async () => {
+  const base = await engine.frame(engine.status()!.id);
+  let produced = 0;
+  Object.assign(engine, {
+    streamFrame: () => ({ ...base, etag: String(++produced) }),
+    setStreaming: vi.fn().mockResolvedValue(undefined),
+  });
+  const ws = await connect();
+  let frames = 0;
+  ws.on('message', (_data, binary) => {
+    if (binary) frames++;
+  });
+  await authenticate(ws);
+  await expect.poll(() => frames).toBe(2);
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  expect(frames).toBe(2);
+  ws.send(JSON.stringify({ type: 'frameAck', sequence: 2 }));
+  await expect.poll(() => frames).toBe(4);
+  const closed = new Promise<number>((resolve) => ws.once('close', resolve));
+  ws.send(JSON.stringify({ type: 'frameAck', sequence: 999 }));
+  expect(await closed).toBe(4400);
+});

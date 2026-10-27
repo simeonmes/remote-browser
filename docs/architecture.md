@@ -27,11 +27,11 @@ Allowlist mode retains the original GET-only fetcher, disabled scripts/cookies/W
 
 ## Display and tradeoffs
 
-Each binary WebSocket frame contains a four-byte big-endian JSON header length, bounded metadata (sequence, revision, width, height) and JPEG data. The client validates metadata and JPEG framing before creating a blob URL. At most two image URLs are retained, with cleanup when the stream ends.
+Each binary WebSocket frame contains a four-byte big-endian JSON header length, bounded metadata (sequence, revision, width, height) and JPEG data. The client validates metadata and JPEG framing before creating a blob URL. It decodes before presentation, retains two displayed URLs plus at most one decoding URL, and keeps only the newest pending frame. All URLs are released on disconnect.
 
-Capture is capped at 5 fps during activity and 1 fps after two idle seconds. Only one screenshot runs at a time; concurrent requests share it. A short cache avoids redundant captures. Image digests suppress unchanged payloads. Hidden clients pause capture; high buffered amounts skip capture/transmission. Input movement is throttled, wheel input coalesced, resize debounced. The HTTP ETag frame route remains available for diagnostics.
+`ChromiumDisplay` subscribes to `Page.screencastFrame` on the private CDP pipe. Chromium produces images on visual changes; the backend retains only the latest image and delivers at up to 30 fps. Each Chromium frame is acknowledged promptly, while a separate client `frameAck` confirms decoding/presentation (or intentional replacement). At most two frames are outstanding to the client, so a slow decoder or connection cannot accumulate a long playback queue. Hidden clients and sustained backpressure stop the compositor capture. Resize/navigation changes restart capture with a new revision; stale dimensions/revisions never become input targets. Input movement is throttled, wheel input coalesced at 33 ms, and resize debounced. The existing HTTP screenshot/ETag route remains available for diagnostics and is not the live display source.
 
-JPEG/WebSocket avoids a video encoder, signaling service and WebRTC transport complexity. Its cost is higher CPU/bandwidth per moving frame, lower motion smoothness and softer text than an optimized video stream. There is no audio. A bitmap also lacks semantic accessibility and remote clipboard readback. These are intentional prototype limits, not features implied by a browser-looking interface.
+JPEG/WebSocket avoids an additional video encoder, signaling service or network transport. Full JPEG frames cost more bandwidth than inter-frame video compression, and fine text can soften. The 30 fps target is measured locally, not guaranteed on every page or connection. There is no audio. A bitmap also lacks semantic accessibility and remote clipboard readback. See [reproducible display measurements](display-performance.md).
 
 ## Reconnection
 

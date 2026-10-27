@@ -26,6 +26,7 @@ import { RemoteApi } from './api';
 import { resolveAddress } from './address';
 import { RemoteViewport } from './RemoteViewport';
 import { RemoteStream } from './remote-stream';
+import { FramePresenter } from './frame-presenter';
 
 function ToolButton({
   label,
@@ -73,6 +74,7 @@ export function BrowserWindow({
   const [error, setError] = useState('');
   const [frame, setFrame] = useState<{ url: string; metadata: FrameMetadata } | null>(null);
   const [streamState, setStreamState] = useState('Connecting display');
+  const [displayFps, setDisplayFps] = useState(0);
   const stream = useRef<RemoteStream | null>(null);
   const onSessionRef = useRef(onSession);
   onSessionRef.current = onSession;
@@ -91,34 +93,38 @@ export function BrowserWindow({
     setFrame(null);
     setFrameError('');
     if (!token || !session) return;
-    const urls = new Set<string>();
+    let presented = 0;
+    let measuredAt = performance.now();
+    const presenter = new FramePresenter((next) => {
+      presented++;
+      setFrame(next);
+    });
+    const measure = setInterval(() => {
+      const now = performance.now();
+      setDisplayFps(Math.round((presented * 1000) / (now - measuredAt)));
+      presented = 0;
+      measuredAt = now;
+    }, 1000);
     const connection = new RemoteStream(api.baseUrl, session.id, token, {
       session: (next) => onSessionRef.current(next),
       state: setStreamState,
       error: setFrameError,
-      frame: (jpeg, metadata) => {
-        const url = URL.createObjectURL(new Blob([new Uint8Array(jpeg)], { type: 'image/jpeg' }));
-        urls.add(url);
-        // Keep at most the current and next images while the DOM decodes a replacement.
-        while (urls.size > 2) {
-          const old = urls.values().next().value!;
-          URL.revokeObjectURL(old);
-          urls.delete(old);
-        }
-        setFrame({ url, metadata });
-      },
+      frame: (jpeg, metadata) => presenter.push(jpeg, metadata),
     });
     stream.current = connection;
     return () => {
       connection.close();
       stream.current = null;
-      for (const url of urls) URL.revokeObjectURL(url);
+      clearInterval(measure);
+      presenter.close();
+      setDisplayFps(0);
     };
   }, [api, token, session?.id]);
 
   function sendInput(input: BrowserInput) {
     void stream.current
       ?.command({ type: 'input', input })
+      .then(() => setFrameError(''))
       .catch((cause: Error) => setFrameError(cause.message));
   }
   async function navigation(action: NavigationAction) {
@@ -383,7 +389,8 @@ export function BrowserWindow({
       </div>
       {session && (
         <div className="display-caption">
-          {session.viewport.width} × {session.viewport.height} · Up to 5 fps while active ·{' '}
+          {session.viewport.width} × {session.viewport.height} ·{' '}
+          <span data-testid="display-fps">{displayFps} fps</span> · 30 fps target ·{' '}
           {status?.browsingMode === 'public' ? 'JavaScript enabled' : 'Page scripts disabled'}
         </div>
       )}

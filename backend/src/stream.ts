@@ -37,6 +37,9 @@ export class StreamHub {
       let running = false;
       let pumping = false;
       let sequence = 0;
+      let acknowledged = 0;
+      let acknowledgedAt = Date.now();
+      let nextFrameAt = 0;
       let alive = true;
       let lastFrame = '';
       let activityAt = Date.now();
@@ -44,6 +47,7 @@ export class StreamHub {
       let lastStatus = '';
       let lastId = 0;
       let allowance = 120;
+      let frameAllowance = 120;
       let replenished = Date.now();
       const queue: Command[] = [];
       const send = (message: ServerMessage) => {
@@ -130,11 +134,18 @@ export class StreamHub {
               lastStatus = snapshot;
               activityAt = Date.now();
             }
-            if (!visible || session.state !== 'ready' || socket.bufferedAmount > 512 * 1024) return;
-            const interval = Date.now() - activityAt < 2000 ? 200 : 1000;
-            if (Date.now() - capturedAt < interval) return;
-            capturedAt = Date.now();
-            const frame = await this.engine.frame(id);
+            const now = Date.now();
+            const enabled =
+              visible && session.state === 'ready' && socket.bufferedAmount < 512 * 1024;
+            await this.engine.setStreaming?.(
+              enabled && !(sequence - acknowledged >= 2 && now - acknowledgedAt > 500),
+            );
+            if (!enabled || sequence - acknowledged >= 2 || now < nextFrameAt) return;
+            const live = !!this.engine.streamFrame;
+            if (!live && now - capturedAt < (now - activityAt < 2000 ? 200 : 1000)) return;
+            const frame = live ? this.engine.streamFrame!() : await this.engine.frame(id);
+            if (!frame) return;
+            capturedAt = now;
             authenticate();
             const key = `${frame.revision}:${frame.etag}`;
             if (closed || !visible || key === lastFrame || socket.bufferedAmount > 512 * 1024)
@@ -150,6 +161,7 @@ export class StreamHub {
                 frame.bytes,
               ),
             );
+            nextFrameAt = Math.max(nextFrameAt + 1000 / 30, now);
             lastFrame = key;
           } catch (error) {
             if (!(error instanceof AppError && error.statusCode === 409)) fail(error);
@@ -157,7 +169,7 @@ export class StreamHub {
             pumping = false;
           }
         })();
-      }, 200);
+      }, 8);
       authDeadline.unref();
       pump.unref();
 
@@ -166,16 +178,17 @@ export class StreamHub {
         if (closed || socket.readyState !== 1) return;
         const now = Date.now();
         allowance = Math.min(120, allowance + (now - replenished) * 0.06);
+        frameAllowance = Math.min(120, frameAllowance + (now - replenished) * 0.06);
         replenished = now;
-        if (--allowance < 0) {
-          socket.close(4429, 'Input rate exceeded.');
-          return;
-        }
         let message: ClientMessage;
         try {
           message = clientMessageSchema.parse(binary ? null : JSON.parse(data.toString()));
         } catch {
           socket.close(4400, 'Invalid message.');
+          return;
+        }
+        if ((message.type === 'frameAck' ? --frameAllowance : --allowance) < 0) {
+          socket.close(4429, 'Input rate exceeded.');
           return;
         }
         if (!token) {
@@ -203,6 +216,17 @@ export class StreamHub {
           authenticate();
           if (message.type === 'auth')
             throw new AppError(400, 'INVALID_MESSAGE', 'Already authenticated.');
+          if (message.type === 'frameAck') {
+            if (message.sequence > sequence) {
+              socket.close(4400, 'Invalid frame acknowledgment.');
+              return;
+            }
+            if (message.sequence > acknowledged) {
+              acknowledged = message.sequence;
+              acknowledgedAt = Date.now();
+            }
+            return;
+          }
           if (message.type === 'visibility') {
             visible = message.visible;
             if (visible) activityAt = Date.now();
@@ -232,6 +256,7 @@ export class StreamHub {
         if (this.active === socket) {
           this.active = undefined;
           void this.engine.releaseInput();
+          void this.engine.setStreaming?.(false).catch(() => {});
         }
       };
       socket.on('close', cleanup);
@@ -247,5 +272,6 @@ export class StreamHub {
     this.sockets.clear();
     this.active = undefined;
     void this.engine.releaseInput();
+    void this.engine.setStreaming?.(false).catch(() => {});
   }
 }

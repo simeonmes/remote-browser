@@ -1,5 +1,9 @@
 # Verification
 
+## Compositor display upgrade - October 27, 2026
+
+170 regular tests and 14 real Chromium tests pass. Typechecks, production/Pages builds, root UI regression checks, the Pages-path public UI benchmark and compositor cleanup profiling also pass. The latest end-to-end benchmark displayed 30.0 fps at 1039 x 584, with 97 ms median / 105 ms maximum click-to-visible-pixel delay across five samples and 1.62 Mbps display payload. Ten public sessions with compositor capture enabled retained 1.71 MiB after warming and GC. See [methodology and limits](display-performance.md).
+
 ## Public-browsing extension ? October 27, 2026
 
 - `npm run check`: passed types, 168 regular tests and production builds.

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { preview } from 'vite';
 import { buildApp } from '../backend/dist/app.js';
@@ -47,6 +47,12 @@ try {
   });
   browser = await chromium.launch({ headless: true, chromiumSandbox: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1080 } });
+  let displayBytes = 0;
+  page.on('websocket', (socket) =>
+    socket.on('framereceived', (event) => {
+      if (Buffer.isBuffer(event.payload)) displayBytes += event.payload.length;
+    }),
+  );
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto(`http://127.0.0.1:5173${base}`);
@@ -101,6 +107,99 @@ try {
   await until(() => submitted === 'https://example.org/path');
   await page.unroute('**/api/sessions/*/navigate');
   await mkdir(new URL('../test-results/', import.meta.url), { recursive: true });
+  if (process.argv.includes('--performance')) {
+    await page.getByLabel('Address bar').fill('http://app.example/motion');
+    await page.getByRole('button', { name: 'Navigate', exact: true }).click();
+    await page.getByRole('img', { name: 'Remote Chromium viewport: Motion fixture' }).waitFor();
+    await frame.evaluate((image) => image.decode());
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const bytesBefore = displayBytes;
+    const motion = await frame.evaluate(
+      (image) =>
+        new Promise((resolve) => {
+          const times = [];
+          const started = performance.now();
+          const loaded = () => times.push(performance.now());
+          image.addEventListener('load', loaded);
+          setTimeout(() => {
+            image.removeEventListener('load', loaded);
+            const elapsed = performance.now() - started;
+            const gaps = times
+              .slice(1)
+              .map((time, index) => time - times[index])
+              .sort((a, b) => a - b);
+            resolve({
+              frames: times.length,
+              elapsedMs: Math.round(elapsed),
+              displayedFps: +((times.length * 1000) / elapsed).toFixed(1),
+              p95FrameGapMs: Math.round(gaps[Math.floor(gaps.length * 0.95)] ?? 0),
+            });
+          }, 6000);
+        }),
+    );
+    const displayMbps = +(
+      ((displayBytes - bytesBefore) * 8) /
+      (motion.elapsedMs / 1000) /
+      1_000_000
+    ).toFixed(2);
+    const latencies = [];
+    for (let sample = 0; sample < 5; sample++) {
+      await frame.evaluate((image) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1;
+        canvas.height = 1;
+        const context = canvas.getContext('2d');
+        const red = () => {
+          context.drawImage(image, 10, 10, 1, 1, 0, 0, 1, 1);
+          return context.getImageData(0, 0, 1, 1).data[0] > 150;
+        };
+        const before = red();
+        let clickedAt;
+        window.__displayLatency = undefined;
+        const click = () => {
+          clickedAt = performance.now();
+        };
+        const loaded = () => {
+          if (clickedAt !== undefined && red() !== before) {
+            window.__displayLatency = Math.round(performance.now() - clickedAt);
+            image.removeEventListener('load', loaded);
+          }
+        };
+        image.addEventListener('pointerdown', click, { once: true });
+        image.addEventListener('load', loaded);
+      });
+      const bounds = await frame.boundingBox();
+      await page.mouse.click(bounds.x + 30, bounds.y + 30);
+      await page.waitForFunction(
+        () => window.__displayLatency !== undefined,
+        {},
+        { timeout: 3000 },
+      );
+      latencies.push(await page.evaluate(() => window.__displayLatency));
+    }
+    latencies.sort((a, b) => a - b);
+    const report = {
+      ...motion,
+      displayMbps,
+      viewport: engine.status().viewport,
+      medianClickToDisplayedPixelMs: latencies[2],
+      maxClickToDisplayedPixelMs: latencies.at(-1),
+      inputSamples: latencies,
+    };
+    await writeFile(
+      new URL('../test-results/display-performance.json', import.meta.url),
+      JSON.stringify(report, null, 2) + '\n',
+    );
+    console.log('DISPLAY PERFORMANCE: ' + JSON.stringify(report));
+    assert.ok(
+      motion.displayedFps >= 27,
+      'Animated fixture should sustain approximately 30 displayed fps.',
+    );
+    assert.ok(
+      latencies.at(-1) < 250,
+      'Local input-to-visible-pixel delay should stay below 250 ms.',
+    );
+  }
   await page.screenshot({
     path: fileURLToPath(new URL('../test-results/public-ui.png', import.meta.url)),
     fullPage: true,

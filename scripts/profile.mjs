@@ -21,6 +21,12 @@ const engine = publicMode
 async function cycle() {
   const session = await engine.start({ width: 800, height: 600 });
   const browser = engine.browser;
+  await engine.setStreaming(true);
+  const deadline = Date.now() + 5000;
+  while (!engine.streamFrame()) {
+    if (Date.now() > deadline) throw new Error('Frame stream did not start.');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
   await engine.frame(session.id);
   await engine.stop();
   assert.equal(browser.isConnected(), false);
@@ -28,6 +34,7 @@ async function cycle() {
   assert.equal(engine.guard, undefined);
   assert.equal(engine.capture, undefined);
   assert.equal(engine.cached, undefined);
+  assert.equal(engine.display, undefined);
 }
 async function heap() {
   await new Promise((resolve) => setTimeout(resolve, 100));

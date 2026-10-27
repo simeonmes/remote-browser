@@ -14,7 +14,7 @@ export type StreamCommand = Command extends infer T
   : never;
 type Callbacks = {
   session: (session: BrowserSession) => void;
-  frame: (jpeg: Uint8Array, metadata: FrameMetadata) => void;
+  frame: (jpeg: Uint8Array, metadata: FrameMetadata) => void | Promise<void>;
   state: (state: string) => void;
   error: (message: string) => void;
 };
@@ -68,7 +68,14 @@ export class RemoteStream {
           const frame = decodeFrame(event.data);
           if (frame.metadata.sequence <= sequence) return;
           sequence = frame.metadata.sequence;
-          this.callbacks.frame(frame.jpeg, frame.metadata);
+          void Promise.resolve(this.callbacks.frame(frame.jpeg, frame.metadata))
+            .then(() => {
+              if (!this.stopped && this.socket === socket && socket.readyState === WebSocket.OPEN)
+                socket.send(
+                  JSON.stringify({ type: 'frameAck', sequence: frame.metadata.sequence }),
+                );
+            })
+            .catch(() => this.callbacks.error('The display frame could not be decoded.'));
           return;
         }
         const message = serverMessageSchema.parse(JSON.parse(String(event.data)));

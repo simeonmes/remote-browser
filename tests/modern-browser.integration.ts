@@ -78,3 +78,22 @@ it('blocks redirects to a private destination at the proxy layer', async () => {
   await engine.navigate(session.id, 'http://app.example/redirect-private').catch(() => {});
   expect(fixture.hits.some((hit) => hit.url.endsWith('/probe'))).toBe(false);
 });
+
+it('streams compositor frames, fences resizing and releases the capture on stop', async () => {
+  const session = await engine.start({ width: 800, height: 600 });
+  await engine.setStreaming(true);
+  await expect.poll(() => engine.streamFrame()?.width).toBe(800);
+  const first = engine.streamFrame()!;
+  expect(first.bytes.length).toBeGreaterThan(1000);
+  await engine.resize(session.id, { width: 640, height: 480 });
+  expect(engine.streamFrame()).toBeUndefined();
+  await engine.setStreaming(true);
+  await expect.poll(() => engine.streamFrame()?.width).toBe(640);
+  expect(engine.streamFrame()?.revision).toBe(engine.status()?.revision);
+  await engine.setStreaming(false);
+  expect(engine.streamFrame()).toBeUndefined();
+  await engine.setStreaming(true);
+  await expect.poll(() => engine.streamFrame()).toBeDefined();
+  await engine.stop();
+  expect(engine.streamFrame()).toBeUndefined();
+});

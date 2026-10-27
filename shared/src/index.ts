@@ -94,6 +94,7 @@ const commandId = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 export const clientMessageSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('auth'), token: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }),
   z.strictObject({ type: z.literal('visibility'), visible: z.boolean() }),
+  z.strictObject({ type: z.literal('frameAck'), sequence: commandId }),
   z.strictObject({ type: z.literal('input'), id: commandId, input: inputSchema }),
   z.strictObject({ type: z.literal('resize'), id: commandId, viewport: viewportSchema }),
   z.strictObject({ type: z.literal('navigation'), id: commandId, action: navigationActionSchema }),

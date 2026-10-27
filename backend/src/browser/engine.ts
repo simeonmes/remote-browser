@@ -12,6 +12,7 @@ import { validateNavigationUrl } from '../url-policy.js';
 import { SafeFetcher, type Resource, type ResourceFetcher } from './safe-fetch.js';
 import { startDenyProxy } from './deny-proxy.js';
 import { startEgressProxy } from './egress-proxy.js';
+import { ChromiumDisplay } from './display.js';
 
 export type EngineOptions = {
   mode?: 'public' | 'allowlist';
@@ -36,6 +37,8 @@ export interface BrowserEngine {
   resize(id: string, viewport: Viewport): Promise<BrowserSession>;
   history(id: string, action: NavigationAction): Promise<BrowserSession>;
   releaseInput(): Promise<void>;
+  setStreaming?(enabled: boolean): Promise<void>;
+  streamFrame?(): Frame | undefined;
 }
 
 /** One ephemeral Chromium session using either guarded public networking or a restricted fetcher. */
@@ -62,6 +65,7 @@ export class PlaywrightEngine implements BrowserEngine {
   private pendingNavigation: string | undefined;
   private pressedButtons = new Set<'left' | 'middle' | 'right'>();
   private adoptingPopup = false;
+  private display: ChromiumDisplay | undefined;
 
   constructor(
     private readonly options: EngineOptions,
@@ -411,6 +415,24 @@ export class PlaywrightEngine implements BrowserEngine {
     return capture;
   }
 
+  async setStreaming(enabled: boolean) {
+    if (!enabled && !this.display) return;
+    this.display ??= new ChromiumDisplay();
+    const session = this.session;
+    await this.display.sync(
+      enabled && this.inputChannel && session?.state === 'ready'
+        ? { channel: this.inputChannel, revision: session.revision, viewport: session.viewport }
+        : undefined,
+    );
+  }
+
+  streamFrame(): Frame | undefined {
+    const frame = this.display?.frame();
+    return this.session?.state === 'ready' && frame?.revision === this.session.revision
+      ? frame
+      : undefined;
+  }
+
   private requireSession(id: string): BrowserSession {
     if (!this.session || this.session.id !== id)
       throw new AppError(404, 'SESSION_NOT_FOUND', 'This browser session no longer exists.');
@@ -750,8 +772,11 @@ export class PlaywrightEngine implements BrowserEngine {
     this.pressedButtons.clear();
     const browser = this.browser;
     const guard = this.guard;
+    const display = this.display;
+    this.display = undefined;
     this.browser = undefined;
     this.guard = undefined;
+    await display?.close();
     await browser?.close().catch(() => {});
     await guard?.close();
   }

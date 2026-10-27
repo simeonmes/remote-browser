@@ -69,6 +69,21 @@ export async function startModernFixture(createProxy: typeof startEgressProxy) {
       response.end('<title>Second modern page</title><h1>Second page</h1>');
       return;
     }
+    if (url.pathname === '/motion') {
+      response.setHeader('content-type', 'text/html');
+      response.end(`<!doctype html><title>Motion fixture</title><style>body{margin:0;overflow:hidden;background:#123}canvas{display:block}</style><canvas id="motion"></canvas><script>
+        const canvas=document.querySelector('canvas');const ctx=canvas.getContext('2d');let changed=false;
+        canvas.width=innerWidth;canvas.height=innerHeight;
+        onresize=()=>{canvas.width=innerWidth;canvas.height=innerHeight;};
+        onpointerdown=()=>{changed=!changed;};
+        function draw(t){ctx.fillStyle='#123';ctx.fillRect(0,0,canvas.width,canvas.height);
+          ctx.fillStyle=changed?'#ff0000':'#000000';ctx.fillRect(0,0,100,100);
+          ctx.fillStyle='#8fe';ctx.fillRect((t/4)%(canvas.width-100),180,100,100);
+          ctx.fillStyle='#fff';ctx.font='30px Arial';ctx.fillText('Frame '+Math.floor(t),120,70);
+          requestAnimationFrame(draw);}requestAnimationFrame(draw);
+        </script>`);
+      return;
+    }
     response.setHeader('content-type', 'text/html');
     response.end(
       `<!doctype html><title>Modern fixture</title><style>body{font:20px Arial;padding:24px;background:#def3e8}</style><h1>Modern fixture</h1><p id="result">Loading</p><p id="live">Connecting</p><button id="change">Change text</button><form method="post" action="/login"><input name="name" value="test"><button id="submit">Sign in</button></form><a id="next" href="http://second.example/second">Next domain</a><a id="popup" href="/second" target="_blank">Open new window</a><script src="/app.js"></script>`,

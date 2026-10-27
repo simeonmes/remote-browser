@@ -91,7 +91,7 @@ export function RemoteViewport({
         if (wheel) latest.current.sendInput({ kind: 'wheel', ...wheel });
         wheel = undefined;
         wheelTimer = undefined;
-      }, 50);
+      }, 33);
     };
     target.addEventListener('wheel', scroll, { passive: false });
     return () => {

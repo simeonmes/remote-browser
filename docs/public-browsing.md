@@ -29,7 +29,7 @@ Chromium handles normal website behavior through a local network guard. Each ups
 
 ## Practical limits
 
-This is broader web browsing, not complete desktop-Chrome feature parity. There is no audio transport, file upload/download workflow, persistent profile, extension installation, full tab UI or remote clipboard readback. Video has the JPEG viewport's low frame rate. Service workers are blocked, dialogs are dismissed, and permissions such as camera/microphone are not granted. Websites depending on these features or on popup opener flows may not work. Cookies and site storage disappear when the browser session ends.
+This is broader web browsing, not complete desktop-Chrome feature parity. There is no audio transport, file upload/download workflow, persistent profile, extension installation, full tab UI or remote clipboard readback. The display targets 30 fps using compositor JPEG frames; it is not a media streaming service. Service workers are blocked, dialogs are dismissed, and permissions such as camera/microphone are not granted. Websites depending on these features or on popup opener flows may not work. Cookies and site storage disappear when the browser session ends.
 
 Private/reserved networks, IP-address URLs, internal hostnames, nonstandard ports and non-HTTP web navigation remain blocked. A bounded traffic budget may require Stop/Start during heavy browsing. These controls are independent of the selected search provider.
 

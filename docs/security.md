@@ -38,4 +38,6 @@ The WebSocket handshake validates Host and Origin. A first-message bearer token 
 
 ## Secret hygiene
 
+Display acknowledgments have their own bounded rate allowance, separate from input, and cannot acknowledge an unsent sequence. Only two frames may remain unacknowledged. Hidden/disconnected clients stop compositor capture, and all display handlers and cached frames are released with the browser session. No additional listening port or network transport is introduced by the 30 fps display.
+
 `backend/.env` is ignored by Git; the example contains no usable secret. All `VITE_` variables are public. `npm run setup` will not replace an existing key. To rotate it, replace `AUTH_SECRET` with a fresh cryptographically random value locally and restart the backend; all in-memory sessions disappear on restart. Review `git status` before commits. Never commit profiles, screenshots of authenticated pages, `.env` files, or tokens. Windows ACLs—not the POSIX mode supplied by the setup script—control local-file access on Windows.
