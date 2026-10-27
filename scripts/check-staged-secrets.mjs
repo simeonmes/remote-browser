@@ -17,7 +17,9 @@ try {
 const rejected = [];
 for (const file of files) {
   if (
-    /(^|\/)(?:node_modules|dist|\.playwright|test-results|\.npm-cache)(\/|$)/.test(file) ||
+    /(^|\/)(?:node_modules|dist|\.playwright|\.tools|\.remote|test-results|\.npm-cache)(\/|$)/.test(
+      file,
+    ) ||
     (/(^|\/)\.env(?:\.|$)/.test(file) && !file.endsWith('.env.example'))
   ) {
     rejected.push(file);

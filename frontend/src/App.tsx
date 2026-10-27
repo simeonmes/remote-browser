@@ -324,7 +324,9 @@ export default function App({ api }: { api: RemoteApi }) {
                 )}
               </div>
               <div className="policy-note">
-                The backend listens on localhost. Remote access is not configured.
+                {api.baseUrl.startsWith('https:')
+                  ? 'Connected through HTTPS. Keep your Victus and remote-access command running.'
+                  : 'Local connection. Use the remote-access command to connect from another device.'}
               </div>
             </section>
             <div className="help-note">

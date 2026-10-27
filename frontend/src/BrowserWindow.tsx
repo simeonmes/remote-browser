@@ -181,7 +181,9 @@ export function BrowserWindow({
         <div className="active-tab">
           <Globe2 size={14} />
           <span className="tab-title">{session?.title || 'Personal browser'}</span>
-          <span className="tab-status">LOCAL</span>
+          <span className="tab-status">
+            {api.baseUrl.startsWith('https:') ? 'REMOTE' : 'LOCAL'}
+          </span>
         </div>
         <span className="tab-lock">
           <ShieldCheck size={15} />

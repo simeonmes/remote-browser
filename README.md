@@ -101,6 +101,8 @@ The display uses Chromium's compositor frame stream with a **30 fps delivery tar
 
 ## GitHub Pages
 
+For the optional browser-only connection from another device, see [remote access setup](docs/remote-access.md). `npm run remote` deliberately creates a public HTTPS endpoint protected by the app's authentication and updates the Pages deployment. Ordinary `npm run dev` remains local-only.
+
 `npm run build:pages` produces independently deployable `frontend/dist` assets. **GitHub Pages hosts only the static frontend. It cannot run Node.js, Playwright, Chromium or the WebSocket backend.** An accessible frontend does not mean its backend connection is reachable or permitted.
 
 The Pages workflow is manual. Publishing requires its explicit `publish` checkbox; ordinary pushes run checks only. No GitHub repository, remote, push, hosted workflow or deployment was created during this work. See [publishing instructions and network limitations](docs/github-pages.md).

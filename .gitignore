@@ -6,6 +6,8 @@ coverage/
 !.env.example
 .npm-cache/
 .playwright/
+.tools/
+.remote/
 test-results/
 playwright-report/
 *.log
